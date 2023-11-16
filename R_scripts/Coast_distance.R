@@ -5,7 +5,7 @@ library(viridis)
 library(RColorBrewer)
 library(tidyr)
 library(ggplot2)
-
+# edited 
 setwd("E:/TIMELINE_SST/")
 shp_path <- "GIS/Europe/Europe.gpkg"
 plt_path = "OUT/Plots/Coast_distance/"
