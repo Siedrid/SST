@@ -15,6 +15,7 @@ import pyproj
 from rasterio.crs import CRS
 import rasterio.mask
 import rasterio.warp
+import rioxarray
 import gc
 from datetime import datetime
 import pandas as pd
@@ -67,6 +68,8 @@ path_out = 'E:/TIMELINE_SST/OUT/Mosaics/Validation/'
 path_cci= hard_drive + ':/TIMELINE_SST/CCI/'
 
 shp_path = ':/TIMELINE_SST/GIS/Sites/'
+europe_path = 'E:/TIMELINE_SST/GIS/Europe/Europe.gpkg'
+
 
 def mosaic_ds(short):
     tl_shp = hard_drive + shp_path + short + '.gpkg'
@@ -75,6 +78,11 @@ def mosaic_ds(short):
     shapefile = gpd.read_file(tl_shp)
     dis_shp = shapefile.dissolve()
     geometry = dis_shp.geometry[0]
+    
+    # read europe gpkg
+    euro = gpd.read_file(europe_path)
+    euro_trans = euro.to_crs(3035)#
+   
     dates = []
     med_sst = []
     obs_count = []
