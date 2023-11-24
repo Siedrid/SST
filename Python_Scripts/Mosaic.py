@@ -18,6 +18,18 @@ from rasterio.crs import CRS
 import rasterio.mask
 import rasterio.warp
 import gc
+import pandas as pd
+
+reproj=tl3_analysis_toolbox.reproj()
+tl_crop = tl3_analysis_toolbox.crop()
+hard_drive = 'E'
+
+path_in = 'E:/TIMELINE_SST/OUT/results/V2/'
+path_out = 'E:/TIMELINE_SST/OUT/Mosaics/'
+tile_list_path = "E:/TIMELINE_SST/Tile_Lists/"
+
+shp_path = ':/TIMELINE_SST/GIS/sst_analysis_polygons/'
+all_shp = hard_drive + shp_path + 'intersting_sst_analysis.shp'
 
 def write_nc(xds, fn):
     '''
@@ -43,45 +55,46 @@ def find_feature_index_by_id(path, ID):
     return "PolyID is not in Shapefile"
 
 # Check for missing poly_ids in Results folder
-
-def missing_polys():
-    int_sst_analysis = hard_drive + shp_path +'intersting_sst_analysis.shp'
-    poly_lst_shp = set(gpd.read_file(int_sst_analysis)['id'].astype(int).astype(str).values)
+def missing_polys(all_shp, path_in):
+    poly_lst_shp = set(gpd.read_file(all_shp)['id'].astype(int).astype(str).values)
     poly_lst = set(np.unique([os.listdir(path_in)[d].split('_')[0] for d in range(len(os.listdir(path_in)))]))
     
     result = list(poly_lst_shp - poly_lst)
     return result
 
+def read_tile_lst(IHO_name):
+    tile_path = tile_list_path + IHO_name + '.csv'
+    tile_df = pd.read_csv(tile_path)
+    tile_lst = tile_df.ID.astype(int).astype(str).values
+    
+    return tile_lst
+
 #%%
-reproj=tl3_analysis_toolbox.reproj()
-tl_crop = tl3_analysis_toolbox.crop()
-hard_drive = 'E'
 
-path_in = 'E:/TIMELINE_SST/OUT/results/V2/'
-plt_path = 'E:/TIMELINE_SST/OUT/Plots/mosaics/'
-path_out = 'E:/TIMELINE_SST/OUT/Mosaics/'
+def mosaic_mk(IHO_name):
+    '''
+    Function mosaics 1x1° tiles processed with monthly_anomalies.py on the basis of the tile_lists csv dataframes on Drive.
+    Names of the csv files refer to the official boundaries defined in the IHO dataset.
 
-shp_path = ':/TIMELINE_SST/GIS/sst_analysis_polygons/'
-at_shp = hard_drive + ':/TIMELINE_SST/GIS/sst_analysis_polygons/atlantic_polys_t03.shp'    
-all_shp = hard_drive + shp_path + 'intersting_sst_analysis.shp'
-gib_shp = hard_drive + ':/TIMELINE_SST/GIS/sst_analysis_polygons/gibralta_polys_t03.shp'
-baltic_shp = hard_drive + shp_path + 'baltic_sea.shp'
-north_africa_shp = hard_drive + shp_path + 'norther_africa.shp'
-GB_shp = hard_drive + shp_path + 'GB.shp'
-east_euro_shp = hard_drive + shp_path + 'E-Euro.shp'
-italy_shp = hard_drive + shp_path + 'italy.shp'
-spain_shp = hard_drive + shp_path + 'spain.shp'#
-france_shp = hard_drive + shp_path + 'french_atlantic.shp'
-malle_shp = hard_drive + shp_path + 'medi_malle.shp'
+    Parameters
+    ----------
+    IHO_name : TYPE string
+        DESCRIPTION. Official name of the IHO basins, and csv files on drive, e.g. "Adriatic Sea"
 
+    Returns
+    -------
+    None. Writes mosaiced MK and Anomaly (dif) nc files to output directory. Creates one mosaic per month.
 
-# poly_lst = np.unique([os.listdir(path_in)[d].split('_')[0] for d in range(len(os.listdir(path_in)))])
-# all polyids in input path
-
-# Funktion, um all_shp zu IHO basin zu croppen --> get poly_ids
-
-def mosaic_ds(shp_path, short):
-    poly_lst = gpd.read_file(shp_path)['id'].astype(int).astype(str).values
+    '''
+    poly_lst = read_tile_lst(IHO_name)
+    
+    # Replace brackets and Spaces for Output Filename
+    short = IHO_name.replace(" ", "_").replace("(", "").replace(")", "")
+    
+    # create one folder for mosaics per study area
+    p = path_out + short + '/'
+    if not os.path.exists(p):
+        os.makedirs(p)
     
     for month in range(1,13):
         
@@ -92,6 +105,8 @@ def mosaic_ds(shp_path, short):
         
         mk_lst_sort = []
         dif_lst_sort = []
+        
+        # Checking if all files exist in input folder
         for i in range(len(dif_lst)):
             if os.path.isfile(dif_lst[i]):
                 dif_lst_sort.append(dif_lst[i])
@@ -99,17 +114,18 @@ def mosaic_ds(shp_path, short):
             else:
                 print(poly_lst[i] + ' missing in input folder')       
         
-        dif_ds = [xr.open_dataset(dif_lst_sort[i]) for i in range(len(dif_lst_sort))]
+        #dif_ds = [xr.open_dataset(dif_lst_sort[i]) for i in range(len(dif_lst_sort))]
         mk_ds = [xr.open_dataset(mk_lst_sort[i]) for i in range(len(mk_lst_sort))]
         
+        # Variables to keep in Mann-Kendall .nc files
         mk_vars = ['p', 'slope', 'intercept', 'Tau', 'trend', 'h']
         
         for d in range(len(dif_lst_sort)):
             
             # mask non-significant pixel
             mask = mk_ds[d]['h'] == 1
-            dif_ds[d]['obs_count'] = dif_ds[d].obs_count.where(dif_ds[d]['obs_count'] != 0)
-            dif_ds[d]['sst_dif_max'] = (dif_ds[d]['sst_dif_max']*1000).astype(int)
+            #dif_ds[d]['obs_count'] = dif_ds[d].obs_count.where(dif_ds[d]['obs_count'] != 0)
+            #dif_ds[d]['sst_dif_max'] = dif_ds[d]['sst_dif_max'] # Possibility to select specific years, if not all years are of interest
 
             for var in mk_vars:           
                 mk_ds[d][var] = mk_ds[d][var].where(mask)
@@ -120,46 +136,56 @@ def mosaic_ds(shp_path, short):
         monthly_mk = reproj.mosaic_vars(mk_ds, mk_vars, chunksize)
         
         # Merge Monthly Anomalies
-        monthly_dif = reproj.mosaic_vars(dif_ds, ['sst_dif_max', 'obs_count'], chunksize)
-        monthly_dif = xr.merge(dif_ds)
+        #monthly_dif = reproj.mosaic_vars(dif_ds, ['sst_dif_max', 'obs_count'], chunksize)
         
         # Write to netCDF
         print('Write ...')
-        outfile = path_out+short + '/' + str(month).zfill(2) + '_merged_mosaic_mk_v2_' + short +'.nc'        
+        outfile = path_out+short + '/' + str(month).zfill(2) + '_merged_mosaic_mk_' + short +'.nc'        
         write_nc(monthly_mk, outfile)
         
-        outfile=path_out+ short + '/' +str(month).zfill(2) + '_merged_mosaic_dif_v2_' + short + '.nc'        
-        write_nc(monthly_dif, outfile)
+        outfile=path_out+ short + '/' +str(month).zfill(2) + '_merged_mosaic_dif_' + short + '.nc'        
+       # write_nc(monthly_dif, outfile)
     
         print('Closing Datasets ...')
-        monthly_dif.close()
+        #monthly_dif.close()
         monthly_mk.close()
         gc.collect()
         
 
-
-mosaic_ds(north_africa_shp, 'northern_africa')
-mosaic_ds(italy_shp, 'italy')
-mosaic_ds(east_euro_shp, 'eastern_europe')
-mosaic_ds(baltic_shp, 'baltic')
-mosaic_ds(spain_shp, 'spain')
-mosaic_ds(GB_shp, 'GB')
-mosaic_ds(france_shp, 'french_atlantic')
-mosaic_ds(malle_shp, 'malle')
-
 #%% Mosaic Anomalies for 2022
 
-def mosaic_anomalies(shp_path, short, year):
-    poly_lst = gpd.read_file(shp_path)['id'].astype(int).astype(str).values
+def mosaic_anomalies(IHO_name, year):
+    '''
+    Mosaics anomalies for specific years only. Otherwise same as in mosaic_ds
+
+    Parameters
+    ----------
+    IHO_name : TYPE string
+        DESCRIPTION.
+    year : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None. Writes mosaiced anomalies to output directory. Creates one mosaic .nc per month.
+
+    '''
+    poly_lst = read_tile_lst(IHO_name)
+
+    # Replace brackets and Spaces for Output Filename
+    short = IHO_name.replace(" ", "_").replace("(", "").replace(")", "")
+    
+    # create one folder for mosaics per study area
+    p = path_out + short + '/'
+    if not os.path.exists(p):
+        os.makedirs(p)
     
     for month in range(1,13):
         
         print('Mosaicing month ' + str(month))
         
         dif_lst = [path_in + poly_id + '_' + str(month).zfill(2) + '_monthly_dif.nc' for poly_id in poly_lst]
-        #mk_lst = [path_in + poly_id + '_' + str(month).zfill(2) + '_monthly_mk.nc' for poly_id in poly_lst]
         
-        #mk_lst_sort = []
         dif_lst_sort = []
         for i in range(len(dif_lst)):
             if os.path.isfile(dif_lst[i]):
@@ -171,45 +197,26 @@ def mosaic_anomalies(shp_path, short, year):
         dif_ds = [xr.open_dataset(dif_lst_sort[i]) for i in range(len(dif_lst_sort))]
         
         dif_ds_2022 = [dif_ds[d].sel(year = year) for d in range(len(dif_ds))]        
-        #mk_vars = ['p', 'slope', 'intercept', 'Tau', 'trend', 'h']
         
         for d in range(len(dif_lst_sort)):
             
-            # mask not significant pixel
-            #mask = mk_ds[d]['h'] == 1
             dif_ds_2022[d]['obs_count'] = dif_ds_2022[d].obs_count.where(dif_ds_2022[d]['obs_count'] != 0)
             dif_ds_2022[d]['sst_dif_max'] = dif_ds_2022[d]['sst_dif_max']
-            '''
-            for var in mk_vars:           
-                mk_ds[d][var] = mk_ds[d][var].where(mask)
-            '''
-        # Merge MannKendall
+
         print('Merging ...')
-        chunksize=[50,50,50] # wird nicht mehr benötigt
-        #monthly_mk = reproj.mosaic_vars(mk_ds, mk_vars, chunksize)
+        chunksize=[50,50,50]
         
         # Merge Monthly Anomalies
         monthly_dif = reproj.mosaic_vars(dif_ds_2022, ['sst_dif_max', 'obs_count'], chunksize)
-        #monthly_dif = xr.merge(dif_ds)
         
         # Write to netCDF
-        print('Write ...')
-        #outfile = path_out+short + '/' + str(month).zfill(2) + '_merged_mosaic_mk_' + short +'.nc'        
-        #write_nc(monthly_mk, outfile)
-        
-        outfile=path_out+ short + '/' +str(month).zfill(2) + '_merged_mosaic_dif_2022_v3' + short + '.nc'        
+        print('Write ...')        
+        outfile=path_out+ short + '/' +str(month).zfill(2) + '_merged_mosaic_dif_2022_' + short + '.nc'        
         write_nc(monthly_dif, outfile)
     
         print('Closing Datasets ...')
         monthly_dif.close()
-        #monthly_mk.close()
         gc.collect()
 
-mosaic_anomalies(malle_shp, 'malle', 2022)
-mosaic_anomalies(italy_shp, 'italy', 2022)
-mosaic_anomalies(east_euro_shp, 'eastern_europe', 2022)
-mosaic_anomalies(baltic_shp, 'baltic', 2022)
-mosaic_anomalies(north_africa_shp, 'northern_africa', 2022)
-mosaic_anomalies(spain_shp, 'spain', 2022)
-mosaic_anomalies(GB_shp, 'GB', 2022)
-mosaic_anomalies(france_shp, 'french_atlantic', 2022)
+
+#%% Main Workflow
