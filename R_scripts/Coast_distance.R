@@ -1,7 +1,6 @@
 library(raster)
 library(terra)
 library(sf)
-library(viridis)
 library(RColorBrewer)
 library(tidyr)
 library(ggplot2)
@@ -9,34 +8,86 @@ library(ggplot2)
 setwd("E:/TIMELINE_SST/")
 shp_path <- "GIS/Europe/Europe.gpkg"
 plt_path = "OUT/Plots/Coast_distance/"
+mosaic_path <- "OUT/Mosaics/" #path_out von Mosaic.py mit Unterordnern "Skagerrak", Adriatic_Sea", etc.
+tile_path <- "E:/TIMELINE_SST/Tile_Lists/"
 
-sites_path <- "GIS/Sites/"
+get_short <- function(ocean_name){
+  
+  # returns short from IHO ocean database, used also to name the Mosaic .nc files in Mosaic.py
+  lst <- list.files(tile_path)
+  short <- gsub(" ", "_", ocean_name)
+  short <- gsub(".csv", "", short)
+  short <- gsub("[()]", "", short)
+  
+  return(short)
+}
 
-# Site names are Black_Sea, Denmark, Greece, Italy which stand for the Shapefiles (.gpkg) in sites_path
-# short refer to the shorts used for the different Mosaics
-# shorts = c(baltic, eastern_europe, italy)
+read_tile_lists <- function(tile_path, IHO_name){
+  # get list of tile IDs covering IHO basin (from Drive)
+  df <- read.csv(paste0(tile_path, IHO_name, '.csv'))
+  return(df)
+}
 
-distance_slope <- function(m_list, shape, short){
-  # mosaic_file: "_merged_mosaic_mk_baltic.nc"
-  it_mosaics <- paste0("OUT/Mosaics/", short, "/")
+get_bb_list <- function(tile_df){
+  # get bounding box from .csv files
+  tile_bb <- st_bbox(c(xmin = min(tile_df$left), xmax = max(tile_df$right), 
+                       ymax = max(tile_df$top), ymin = min(tile_df$bottom)), crs = 4326)
+  tile_bb <- st_transform(st_as_sfc(tile_bb), crs = 3035) %>% st_bbox()
+  return(tile_bb)
+}
+# load and transform shapefiles to epsg 3035
+load_shp <- function(shp_path){
+  shp <- sf::st_read(shp_path) %>% st_transform(europe_crs, crs = 3035)
+  return(shp)
+}
+
+# create SpatRaster
+stack_lst <- function(short){
+  r_list <- list()
+  for (m in 1:12){
+    m_str <- sprintf("%02d", m)
+    mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_mk_", short, ".nc")
+    r_list[[m]] <- terra::rast(mosaic_name, lyrs = 'slope')
+  }
+  r_c <- terra::rast(r_list)
+  names(r_c) <- month.abb
+  return(r_c)
+}
+
+
+mask_IHO <- function(sp_raster, bb, roi){
+  #poly_ids <- st_crop(poly_shp, bb)
+  IHO <- crop(sp_raster, bb)
+  IHO <- mask(IHO, roi)
+  return(IHO)
+}
+
+europe <- load_shp(shp_path)
+ocean_shp <- load_shp(ocean_path)
+
+ocean_name <- 'Adriatic Sea'
+short <- get_short(ocean_name)
+
+tile_df <- read_tile_lists(tile_path, ocean_name[1])
+roi <- ocean_shp %>% filter(NAME %in% ocean_name)
+bb <- get_bb_list(tile_df)
+short <- get_short(ocean_name[1])
+
+r_c <- stack_lst(short)
+masked_rast <- mask_IHO(r_c, bb, roi)
+
+coast_distance_slope <- function(m_list, shape, short){
+  
+  path2mosaic <- paste0(mosaic_path, short, "/")
   monthly_df <- data.frame(matrix(ncol = length(m_list), nrow = 50))
-  colnames(monthly_df) <- m_list #month.abb
-  europe_crs <- st_crs("+init=epsg:3035")
-  
-  europe <- st_read(shp_path)
-  site <- st_read(paste0(sites_path, shape))
-  site_tr <- st_transform(site, europe_crs)
-  
-  italy_transformed <- st_transform(europe, europe_crs)
-  europe_cropped <- sf::st_crop(italy_transformed, st_bbox(site_tr))
+  colnames(monthly_df) <- month.abb
+
+  europe <- load_shp(shp_path)
+  europe_cropped <- sf::st_crop(europe, bb)
   
   for (m in 1:length(m_list)){
     
     print(paste(m_list[m], "beeing processed"))
-    mosaic_name <- paste0(m_list[m], "_merged_mosaic_mk_", short, ".nc")
-    
-    it_mk <- rast(paste0(it_mosaics,mosaic_name))
-
     mean_slope <- rep(NaN, 50)
     
     for (i in c(1:50)){
@@ -45,13 +96,18 @@ distance_slope <- function(m_list, shape, short){
     
       dif <- st_difference(buf_2, buf_1)
     
-      maske_slope <- mask(it_mk$slope, dif)
-      mean_slope[i] <- mean(maske_slope[,,1], na.rm = T)
+      masked_slope <- mask(masked_rast[[i]], dif)
+      mean_slope[i] <- mean(masked_slope[,,1], na.rm = T)
     }
     monthly_df[,m] <- mean_slope
   }
   
   return(monthly_df)
+}
+
+write_coast_dist <- function(monthly_df){
+  outfile <- paste0(path_out, short, 'coast_dist.csv')
+  write.csv(monthly_df, outfile)
 }
 
 m_list <- c("01", "02", "03", "06", "07", "09", "12")

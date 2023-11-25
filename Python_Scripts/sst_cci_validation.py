@@ -296,8 +296,9 @@ if __name__ == '__main__':
         df = sst_timeseries(IHO_name)
         sorted_df = write_sst_ts(df, short)
         
-        plot_anomalies(sorted_df, get_site_letter(IHO_name))
-        plot_TL_anomalies(sorted_df, get_site_letter(IHO_name))
+        df = load_sst_ts(short)
+        plot_anomalies(df, get_site_letter(IHO_name))
+        plot_TL_anomalies(df, get_site_letter(IHO_name))
 
 
   

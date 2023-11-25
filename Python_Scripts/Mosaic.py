@@ -20,17 +20,6 @@ import rasterio.warp
 import gc
 import pandas as pd
 
-reproj=tl3_analysis_toolbox.reproj()
-tl_crop = tl3_analysis_toolbox.crop()
-hard_drive = 'E'
-
-path_in = 'E:/TIMELINE_SST/OUT/results/V2/'
-path_out = 'E:/TIMELINE_SST/OUT/Mosaics/'
-tile_list_path = "E:/TIMELINE_SST/Tile_Lists/"
-
-shp_path = ':/TIMELINE_SST/GIS/sst_analysis_polygons/'
-all_shp = hard_drive + shp_path + 'intersting_sst_analysis.shp'
-
 def write_nc(xds, fn):
     '''
     Write xarray as netcdf
@@ -69,6 +58,10 @@ def read_tile_lst(IHO_name):
     
     return tile_lst
 
+def short_from_IHO(IHO_name):
+    short = IHO_name.replace(" ", "_").replace("(", "").replace(")", "")
+    return short
+
 #%%
 
 def mosaic_mk(IHO_name):
@@ -89,7 +82,7 @@ def mosaic_mk(IHO_name):
     poly_lst = read_tile_lst(IHO_name)
     
     # Replace brackets and Spaces for Output Filename
-    short = IHO_name.replace(" ", "_").replace("(", "").replace(")", "")
+    short = short_from_IHO(IHO_name)
     
     # create one folder for mosaics per study area
     p = path_out + short + '/'
@@ -140,10 +133,10 @@ def mosaic_mk(IHO_name):
         
         # Write to netCDF
         print('Write ...')
-        outfile = path_out+short + '/' + str(month).zfill(2) + '_merged_mosaic_mk_' + short +'.nc'        
+        outfile = p + str(month).zfill(2) + '_merged_mosaic_mk_' + short +'.nc'        
         write_nc(monthly_mk, outfile)
         
-        outfile=path_out+ short + '/' +str(month).zfill(2) + '_merged_mosaic_dif_' + short + '.nc'        
+        outfile= p +str(month).zfill(2) + '_merged_mosaic_dif_' + short + '.nc'        
        # write_nc(monthly_dif, outfile)
     
         print('Closing Datasets ...')
@@ -211,7 +204,7 @@ def mosaic_anomalies(IHO_name, year):
         
         # Write to netCDF
         print('Write ...')        
-        outfile=path_out+ short + '/' +str(month).zfill(2) + '_merged_mosaic_dif_2022_' + short + '.nc'        
+        outfile= p + str(month).zfill(2) + '_merged_mosaic_dif_2022_' + short + '.nc'        
         write_nc(monthly_dif, outfile)
     
         print('Closing Datasets ...')
@@ -220,3 +213,35 @@ def mosaic_anomalies(IHO_name, year):
 
 
 #%% Main Workflow
+if __name__ == '__main__':
+    
+    reproj=tl3_analysis_toolbox.reproj()
+    tl_crop = tl3_analysis_toolbox.crop()
+    
+    path_in = 'E:/TIMELINE_SST/OUT/results/V2/'
+    path_out = 'E:/TIMELINE_SST/OUT/Mosaics/'
+    tile_list_path = "E:/TIMELINE_SST/Tile_Lists/"
+    
+    shp_path = 'E:/TIMELINE_SST/GIS/sst_analysis_polygons/'
+    all_shp = shp_path + 'intersting_sst_analysis.shp'
+    
+    study_areas = {
+        'Skagerrak': 'A',
+        'Adriatic Sea': 'B',
+        'Aegean Sea': 'C',
+        'Balearic (Iberian Sea)': 'D'
+        } 
+    
+    for key in study_areas.keys():
+        
+        IHO_name = key 
+        print('Mosaicing ' + IHO_name)
+        short = short_from_IHO(IHO_name)
+        poly_lst = read_tile_lst(IHO_name)
+        
+        p = path_out + short + '/'
+        if not os.path.exists(p):
+            os.makedirs(p)    
+            
+        mosaic_mk(IHO_name)
+        mosaic_anomalies(IHO_name, 2022)

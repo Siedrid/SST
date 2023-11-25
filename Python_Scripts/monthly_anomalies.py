@@ -123,7 +123,6 @@ def anomaly_trends():
     path_out= hard_drive + ':/TIMELINE_SST/OUT/decadal_Anomaliesv2/'
     poly_lst = np.unique([os.listdir(path_out)[d].split('_')[0] for d in range(len(os.listdir(path_out)))])
 
-    #shp='D:/TIMELINE_SST/GIS/coast_dk/coast_dk.shp'
     shp = hard_drive + ':/TIMELINE_SST/GIS/sst_analysis_polygons/intersting_sst_analysis.shp'    
     i = find_feature_index_by_id(shp, 3166)
 
@@ -162,10 +161,7 @@ def anomaly_trends():
                 xds_list=[]
                 
                 for tile in tiles:
-                    #xds_mns=xr.Dataset(coords={'x':[],'y':[],'doi':[]})
                     fns = []
-                                  
-                        
                     for year in range(1990,2023,1):            
         
                         if temp_res == 'Decades':
@@ -184,21 +180,19 @@ def anomaly_trends():
                          fn=aux.get_l3_file_from_ida(date_f,temp_res,'SST','v01.01',tile)
                          if fn !=None:
                              fns.append(fn)
-                
-           
+                          
                     # Stack all Observations through the time axis
                     xds = xr.open_mfdataset(fns, combine='nested', concat_dim=['t'], 
                                 chunks={'x': 2300, 'y': 3250},
                                 preprocess=prep.add_date)
                     xds=xds.drop(['lambert_azimuthal_equal_area'])
                     
-                    #if np.any(~np.isnan(xds['sst'][0].values)):
                     if xds.x.size > 0:
-                        # Crop to Subpolygon Shape (1x1 Grad)
+                        # Crop to Subpolygon Shape (1x1°)
                         crop=True
                         xds=tl_crop.crop_ds_with_shp_tiles(xds,poly,crop,tile)
                         xds_list.append(xds) # append to list
-                chunksize=[1000,1000,37] # wird nicht mehr benötigt
+                chunksize=[1000,1000,37] 
                 if temp_res == 'daily':
                     var=['sst','view_time'] # keep only certain variables                
                     # calculate mean and daily anomalies
@@ -215,15 +209,9 @@ def anomaly_trends():
                          'view_time_max', 'valid_obs_count']
                     
                     xds_merged= reproj.mosaic_vars(xds_list,[var],chunksize)
-                    #xds_merged['sst_mean_dec']=xds_merged['sst_mean'].mean(dim='t')
                     xds_merged['sst_max_dec']=xds_merged['sst_max'].mean(dim='t')
-                    #xds_merged['sst_min_dec']=xds_merged['sst_min'].mean(dim='t')
-                    #xds_merged['sst_med_dec']=xds_merged['sst_median'].mean(dim='t')
 
-                    #xds_merged['sst_dif_mean']=xds_merged['sst_mean']-xds_merged['sst_mean_dec']
-                    #xds_merged['sst_dif_min']=xds_merged['sst_min']-xds_merged['sst_min_dec']
                     xds_merged['sst_dif_max']=xds_merged['sst_max']-xds_merged['sst_max_dec']
-                    #xds_merged['sst_dif_med']=xds_merged['sst_median']-xds_merged['sst_med_dec']
 
                     xds_dif=xds_merged[['sst_dif_max']] 
                     
@@ -232,15 +220,12 @@ def anomaly_trends():
                     xds_dif = xds_dif.where(xds_dif['sst_dif_max'] > -4)
                     
                     # Obs Count
-                    #xds_dif['obs_count']=obs_count
                     xds_dif['obs_count'] = xds_merged['valid_obs_count']
                         
 
                 print('Write Dif Netcdf')
                 outfile=path_out+str(poly_id)+'_'+str(doi).zfill(3)+'_' + temp_res +'_dif.nc'        
-                write_nc(xds_dif, outfile)
-                #xds_doi=xr.Dataset(coords={'x':xds_merged.coords['x'],'y':xds_merged.coords['y'], 'doi':doi})
-            
+                write_nc(xds_dif, outfile)            
 
                 xds_dif.close()
                 xds_merged.close()
