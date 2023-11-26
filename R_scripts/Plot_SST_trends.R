@@ -13,22 +13,6 @@ library(ggnewscale)
 library(tidyterra)
 library(dplyr)
 
-
-# Read MK Datasets
-setwd("E:/TIMELINE_SST/")
-mosaic_path <- "OUT/Mosaics/" #path_out von Mosaic.py mit Unterordnern "Skagerrak", Adriatic_Sea", etc.
-plt_path = "Maps/" # Pfad, wo Plots gespeichert werden
-
-# Shape Paths
-shp_path <- "GIS/Europe/Europe.gpkg"
-africa_path <- "GIS/Africa/afr_g2014_2013_0.shp"
-study_site <- "GIS/sst_analysis_polygons/study_area.shp"
-poly_path <- "GIS/sst_analysis_polygons/intersting_sst_analysis.shp"
-ocean_path <- "GIS/World_Seas_IHO_v3/"
-
-# path to tile lists
-tile_path <- "E:/TIMELINE_SST/Tile_Lists/"
-
 read_tile_lists <- function(tile_path, IHO_name){
   # get list of tile IDs covering IHO basin (from Drive)
   df <- read.csv(paste0(tile_path, IHO_name, '.csv'))
@@ -62,12 +46,20 @@ load_shp <- function(shp_path){
 
 
 # create SpatRaster
-stack_lst <- function(short){
+stack_lst <- function(short, mosaic, layer){
+  # by default the year 2022 is used for the anomaly rasters, and the respective file name
   r_list <- list()
   for (m in 1:12){
     m_str <- sprintf("%02d", m)
-    mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_mk_", short, ".nc")
-    r_list[[m]] <- terra::rast(mosaic_name, lyrs = 'slope')
+    if (mosaic == 'MK'){
+      mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_mk_", short, ".nc")
+      r_list[[m]] <- terra::rast(mosaic_name, lyrs = layer)
+    } else if (mosaic == "Dif"){
+      mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_dif_2022_", short, ".nc")
+      r_list[[m]] <- terra::rast(mosaic_name, lyrs = layer)
+    } else {
+      print("Variable mosaic must be either MK or Dif")
+    }
   }
   r_c <- terra::rast(r_list)
   names(r_c) <- month.abb
@@ -89,7 +81,7 @@ crop_ocean <- function(ocean_name, bb){
   return(oc)
 }
 
-plot_sst_maps <- function(ocean_name){
+plot_sst_trend_maps <- function(masked_rast){
   
   g <- ggplot()+
     geom_spatraster(data = masked_rast)+
@@ -116,12 +108,63 @@ plot_sst_maps <- function(ocean_name){
           panel.ontop = T,
           panel.background = element_rect(fill = NA),
           strip.background = element_rect(fill = "white"),
-          legend.position = "bottom", legend.key.width = unit(0.5, "inches"))
+          legend.position = "bottom", legend.key.width = unit(0.5, "inches"))+
+    annotation_scale(location = 'bl')+
+    annotation_north_arrow(location = 'bl', height = unit(0.75, "cm"), width = unit(0.75,"cm"),
+                           pad_x = unit(0.1, "in"), pad_y = unit(0.3, "in"))
   
-  ggsave(paste0(plt_path, short, '.png'), g, width = 20, height = 30, units = "cm")
+  ggsave(paste0(plt_path, short, '_anomaly_trends.png'), g, width = 20, height = 30, units = "cm")
 }
 
+plot_sst_anomaly_maps <- function(masked_rast){
+  
+  g <- ggplot()+
+    geom_spatraster(data = masked_rast)+
+    facet_wrap(~lyr, ncol = 3)+
+    # Raster Legend:
+    scale_fill_gradientn(name = 'K', colours = rev(brewer.pal(9, 'Spectral')), na.value = 'white', limits = c(-3,3))+
+    new_scale_fill()+
+    geom_sf(data = europe, aes(fill = 'light grey')) +
+    geom_sf(data = oc, aes(fill = 'white'))+
+    geom_sf(data = oc, aes(fill = 'grey'))+
+    # Vector Layer Legend:
+    scale_fill_manual(name = "", values = c("light grey", "dark grey", "white"), 
+                      label = c("Sea outside study area", "Land", "No Data"),
+                      na.value = "white")+
+    coord_sf(xlim = c(bb[1],bb[3]), ylim=c(bb[2],bb[4]), expand = F)+
+    xlab("Longitude")+
+    ylab("Latitude")+
+    ggtitle("SST anomalies in 2022")+
+    scale_y_continuous(breaks = seq(30,65, by = 2))+
+    scale_x_continuous(breaks = seq(-15,40, by = 2))+ 
+    # Grid theme:
+    theme(panel.grid.major = element_line(color = gray(.5), linetype = "dashed", 
+                                          linewidth = 0.5), 
+          panel.ontop = T,
+          panel.background = element_rect(fill = NA),
+          strip.background = element_rect(fill = "white"),
+          legend.position = "bottom", legend.key.width = unit(0.5, "inches"))+
+    annotation_scale(location = 'bl')+
+    annotation_north_arrow(location = 'bl', height = unit(0.75, "cm"), width = unit(0.75,"cm"), 
+                           pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in")) 
+  
+  ggsave(paste0(plt_path, short, '_anomalies.png'), g, width = 20, height = 30, units = "cm")
+}
 # Main Workflow-----
+
+setwd("E:/TIMELINE_SST/")
+mosaic_path <- "OUT/Mosaics/" #path_out von Mosaic.py mit Unterordnern "Skagerrak", Adriatic_Sea", etc.
+plt_path = "Maps/" # Pfad, wo Plots gespeichert werden
+
+# Shape Paths
+shp_path <- "GIS/Europe/Europe.gpkg"
+africa_path <- "GIS/Africa/afr_g2014_2013_0.shp"
+study_site <- "GIS/sst_analysis_polygons/study_area.shp"
+poly_path <- "GIS/sst_analysis_polygons/intersting_sst_analysis.shp"
+ocean_path <- "GIS/World_Seas_IHO_v3/"
+
+# path to tile lists
+tile_path <- "E:/TIMELINE_SST/Tile_Lists/"
 
 # Transform Shapefiles
 europe <- load_shp(shp_path)
@@ -137,16 +180,21 @@ E = 'Balearic (Iberian Sea)'
 study_areas <- list(A,B,D,E)
 
 for (i in 1:length(study_areas)){
-  ocean_name <- study_areas[[1]]
+  ocean_name <- study_areas[[i]]
   
   tile_df <- read_tile_lists(tile_path, ocean_name[1])
   roi <- ocean_shp %>% filter(NAME %in% ocean_name)
   bb <- get_bb_list(tile_df)
   short <- get_short(ocean_name[1])
   
-  r_c <- stack_lst(short)
-  masked_rast <- mask_IHO(r_c, bb, roi)
+  r_c_mk <- stack_lst(short, 'MK', layer = 'slope')
+  masked_rast_mk <- mask_IHO(r_c_mk, bb, roi)
   oc <- crop_ocean(ocean_name,bb)
   
-  plot_sst_maps()
+  r_c_dif <- stack_lst(short, 'Dif', layer = 'sst_dif_max')
+  masked_ras_dif <- mask_IHO(r_c_dif, bb, roi)
+  
+  plot_sst_trend_maps(masked_rast_mk)
+  plot_sst_anomaly_maps(masked_rast_dif)
+  
 }

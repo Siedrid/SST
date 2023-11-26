@@ -5,15 +5,6 @@ library(RColorBrewer)
 library(tidyr)
 library(ggplot2)
 
-setwd("E:/TIMELINE_SST/")
-shp_path <- "GIS/Europe/Europe.gpkg"
-ocean_path <- "GIS/World_Seas_IHO_v3/"
-
-plt_path = "OUT/Plots/Coast_distance/"
-path_out = "GIS/coast_dist/" # directory to write output csv files to
-mosaic_path <- "OUT/Mosaics/" #path_out von Mosaic.py mit Unterordnern "Skagerrak", Adriatic_Sea", etc.
-tile_path <- "E:/TIMELINE_SST/Tile_Lists/"
-
 get_short <- function(ocean_name){
   
   # returns short from IHO ocean database, used also to name the Mosaic .nc files in Mosaic.py
@@ -112,10 +103,10 @@ load_coast_dist <- function(study_areas){
   }
   
   # Reshape the data using gather
-  df_all_sites2 <- df_all_sites[,2:10]
-  colnames(df_all_sites2) <- c("Jan", "Feb", "Mar", "Jun", "Jul", "Sep", "Dec", "site", "dist")
+  df_all_sites2 <- df_all_sites[,2:ncol(df_all_sites)]
+  colnames(df_all_sites2) <- c(month.abb, "site", "dist")
   df_long <- gather(df_all_sites2, key = "Variable", value = "Value", -dist, -site)
-  df_long$Month <- factor(df_long$Variable, levels = c("Jan", "Feb", "Mar", "Jun", "Jul", "Sep", "Dec"))
+  df_long$Month <- factor(df_long$Variable, levels = c(month.abb, "Dec"))
   
   return(df_long)
 }
@@ -133,6 +124,16 @@ plot_coast_dist <- function(df_long){
 }
 
 # Main Workflow ----
+
+setwd("E:/TIMELINE_SST/")
+shp_path <- "GIS/Europe/Europe.gpkg"
+ocean_path <- "GIS/World_Seas_IHO_v3/"
+
+plt_path = "OUT/Plots/Coast_distance/"
+path_out = "GIS/coast_dist/" # directory to write output csv files to
+mosaic_path <- "OUT/Mosaics/" #path_out von Mosaic.py mit Unterordnern "Skagerrak", Adriatic_Sea", etc.
+tile_path <- "E:/TIMELINE_SST/Tile_Lists/"
+
 A = c('Skagerrak', 'Kattegat', 'Baltic Sea', 'North Sea')
 B = 'Adriatic Sea'
 D = c('Aegean Sea', 'Sea of Marmara')
