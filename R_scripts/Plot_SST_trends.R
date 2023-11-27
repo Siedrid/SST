@@ -48,6 +48,8 @@ load_shp <- function(shp_path){
 # create SpatRaster
 stack_lst <- function(short, mosaic, layer){
   # by default the year 2022 is used for the anomaly rasters, and the respective file name
+  # Mosaic stands for either "MK" or "Dif", MK ds with the layers "slope" and "p" respectively,
+  # or Anomaly ds with layer "obs_count" and "sst_dif_max"
   r_list <- list()
   for (m in 1:12){
     m_str <- sprintf("%02d", m)
@@ -68,7 +70,6 @@ stack_lst <- function(short, mosaic, layer){
 
 
 mask_IHO <- function(sp_raster, bb, roi){
-  #poly_ids <- st_crop(poly_shp, bb)
   IHO <- crop(sp_raster, bb)
   IHO <- mask(IHO, roi)
   return(IHO)

@@ -4,6 +4,7 @@ library(sf)
 library(RColorBrewer)
 library(tidyr)
 library(ggplot2)
+library(dplyr)
 
 get_short <- function(ocean_name){
   
@@ -35,7 +36,7 @@ load_shp <- function(shp_path){
   return(shp)
 }
 
-# create SpatRaster
+# create SpatRaster from MK datasets, layer = slope
 stack_lst <- function(short){
   r_list <- list()
   for (m in 1:12){
@@ -54,7 +55,7 @@ mask_IHO <- function(sp_raster, bb, roi){
   return(IHO)
 }
 
-coast_distance_slope <- function(){
+coast_distance_slope <- function(m_list){
   
   monthly_df <- data.frame(matrix(ncol = length(m_list), nrow = 50))
   colnames(monthly_df) <- month.abb
@@ -66,7 +67,7 @@ coast_distance_slope <- function(){
     print(paste(m_list[m], "beeing processed"))
     mean_slope <- rep(NaN, 50)
     
-    for (i in c(1:50)){
+    for (i in c(1:5)){
       buf_2 <- st_buffer(europe_cropped, 1000 * i)
       buf_1 <- st_buffer(europe_cropped, 1000 * (i-1))
     
@@ -77,12 +78,11 @@ coast_distance_slope <- function(){
     }
     monthly_df[,m] <- mean_slope
   }
-  
   return(monthly_df)
 }
 
 write_coast_dist <- function(monthly_df){
-  outfile <- paste0(path_out, short, 'coast_dist.csv')
+  outfile <- paste0(path_out, short, '_coast_dist.csv')
   write.csv(monthly_df, outfile)
 }
 
@@ -90,13 +90,13 @@ write_coast_dist <- function(monthly_df){
 
 load_coast_dist <- function(study_areas){
   short <- study_areas[[1]][1] %>% get_short()
-  df_all_sites <- read.csv(paste0(path_out, short[1], "_coast_dist-v3.csv"))
+  df_all_sites <- read.csv(paste0(path_out, short, "_coast_dist.csv"))
   df_all_sites$site <- rep(short, nrow(df_all_sites))
   df_all_sites$dist <- c(1:50)
   
   for (i in 2:length(study_areas)){
     s <- study_areas[[i]][1] %>% get_short()
-    df <-read.csv(paste0(path_out, s, "_coast_dist-v3.csv"))
+    df <-read.csv(paste0(path_out, s, "_coast_dist.csv"))
     df$site <- rep(s, nrow(df))
     df$dist <- c(1:50)
     df_all_sites <- rbind(df, df_all_sites)
@@ -106,7 +106,7 @@ load_coast_dist <- function(study_areas){
   df_all_sites2 <- df_all_sites[,2:ncol(df_all_sites)]
   colnames(df_all_sites2) <- c(month.abb, "site", "dist")
   df_long <- gather(df_all_sites2, key = "Variable", value = "Value", -dist, -site)
-  df_long$Month <- factor(df_long$Variable, levels = c(month.abb, "Dec"))
+  df_long$Month <- factor(df_long$Variable, levels = m_list)
   
   return(df_long)
 }
@@ -143,12 +143,12 @@ study_areas <- list(A,B,D,E)
 
 europe <- load_shp(shp_path)
 ocean_shp <- load_shp(ocean_path)
-
+m_list <- month.abb
 
 for (i in 1:length(study_areas)){
-  ocean_name <- study_areas[[1]]
+  ocean_name <- study_areas[[i]]
   
-  short <- get_short(ocean_name)
+  short <- get_short(ocean_name[1])
   
   tile_df <- read_tile_lists(tile_path, ocean_name[1])
   roi <- ocean_shp %>% filter(NAME %in% ocean_name)
@@ -158,7 +158,9 @@ for (i in 1:length(study_areas)){
   r_c <- stack_lst(short)
   masked_rast <- mask_IHO(r_c, bb, roi)
   
-  coast_distance_slope()
+  monthly_df <- coast_distance_slope(m_list)
+  write_coast_dist(monthly_df)
+  
 }
 
 df_long <- load_coast_dist(study_areas)

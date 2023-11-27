@@ -65,12 +65,6 @@ def ApplyMannKendall(xds,var,spco):
     print(datetime.now().strftime("%H:%M:%S")+' '+my_func_name)
     xds_var=xds[var]
     arr=np.array(xds_var)
-    
-    #arr[arr<260]=np.nan
-    #pdb.set_trace()
-    #arr=nan_along_time_to_zero(arr) Doesnt work on Geofarm
-    #arr=interpolate_nan(arr,method='linear',limit=1)
-    
     arr=interpolate_along_time(arr, 'linear', 9)
     
     result = np.apply_along_axis(mk.original_test, 0, arr) # Default alpha of 0.05
@@ -117,14 +111,9 @@ def doi_to_month(day_of_year):
 
 #%%
 
-def anomaly_trends():
+def anomaly_trends(path_out, shp_path):
     print('Calculating Decadal Anomalies')
-    hard_drive = 'E'
-    path_out= hard_drive + ':/TIMELINE_SST/OUT/decadal_Anomaliesv2/'
     poly_lst = np.unique([os.listdir(path_out)[d].split('_')[0] for d in range(len(os.listdir(path_out)))])
-
-    shp = hard_drive + ':/TIMELINE_SST/GIS/sst_analysis_polygons/intersting_sst_analysis.shp'    
-    i = find_feature_index_by_id(shp, 3166)
 
     start_date=date(2000,1,1)
     end_date=date(2000,12,31)
@@ -134,7 +123,7 @@ def anomaly_trends():
     prep=tl3_analysis_toolbox.l3_lst_sst_prep()
     reproj=tl3_analysis_toolbox.reproj()
     
-    shapefile=fiona.open(shp, "r")
+    shapefile=fiona.open(shp_path, "r")
     
     for i in range(len(shapefile)):
         poly=shapefile[i]
@@ -234,10 +223,8 @@ def anomaly_trends():
                 gc.collect() # collect garbage
   
 
-def monthly_anomaly_trends():
+def monthly_anomaly_trends(path_in, path_out):
     print('Calculating monthly anomalies')
-    path_in = hard_drive + ':/TIMELINE_SST/OUT/decadal_Anomaliesv2/'
-    path_out= hard_drive + ':/TIMELINE_SST/OUT/monthly_Anomaliesv2/'
     
     dec_doi = np.unique([os.listdir(path_in)[d].split('_')[1] for d in range(len(os.listdir(path_in)))])
     poly_lst = np.unique([os.listdir(path_in)[d].split('_')[0] for d in range(len(os.listdir(path_in)))])
@@ -293,5 +280,10 @@ def monthly_anomaly_trends():
 
 if __name__ == '__main__':
     
-    anomaly_trends()
-    monthly_anomaly_trends()
+    path_out= 'E:/TIMELINE_SST/OUT/decadal_Anomaliesv2/'
+    shp_path = "E:/TIMELINE_SST/GIS/sst_analysis_polygons/intersting_sst_analysis.shp"
+    monthly_path_in = path_out
+    monthly_path_out = 'E:/TIMELINE_SST/OUT/monthly_Anomaliesv2/'
+    
+    anomaly_trends(path_out, shp_path)
+    monthly_anomaly_trends(monthly_path_in, monthly_path_out)

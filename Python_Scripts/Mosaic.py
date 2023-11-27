@@ -79,10 +79,6 @@ def mosaic_mk(IHO_name):
     None. Writes mosaiced MK and Anomaly (dif) nc files to output directory. Creates one mosaic per month.
 
     '''
-    poly_lst = read_tile_lst(IHO_name)
-    
-    # Replace brackets and Spaces for Output Filename
-    short = short_from_IHO(IHO_name)
     
     # create one folder for mosaics per study area
     p = path_out + short + '/'
@@ -163,11 +159,6 @@ def mosaic_anomalies(IHO_name, year):
     None. Writes mosaiced anomalies to output directory. Creates one mosaic .nc per month.
 
     '''
-    poly_lst = read_tile_lst(IHO_name)
-
-    # Replace brackets and Spaces for Output Filename
-    short = IHO_name.replace(" ", "_").replace("(", "").replace(")", "")
-    
     # create one folder for mosaics per study area
     p = path_out + short + '/'
     if not os.path.exists(p):
