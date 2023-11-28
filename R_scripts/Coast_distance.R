@@ -67,7 +67,7 @@ coast_distance_slope <- function(m_list){
     print(paste(m_list[m], "beeing processed"))
     mean_slope <- rep(NaN, 50)
     
-    for (i in c(1:5)){
+    for (i in c(1:50)){
       buf_2 <- st_buffer(europe_cropped, 1000 * i)
       buf_1 <- st_buffer(europe_cropped, 1000 * (i-1))
     
@@ -90,7 +90,7 @@ write_coast_dist <- function(monthly_df){
 
 load_coast_dist <- function(study_areas){
   short <- study_areas[[1]][1] %>% get_short()
-  df_all_sites <- read.csv(paste0(path_out, short, "_coast_dist.csv"))
+  df_all_sites <- read.csv(paste0(path_out, short, "_coast_dist-v3.csv"))
   df_all_sites$site <- rep(short, nrow(df_all_sites))
   df_all_sites$dist <- c(1:50)
   
@@ -104,9 +104,8 @@ load_coast_dist <- function(study_areas){
   
   # Reshape the data using gather
   df_all_sites2 <- df_all_sites[,2:ncol(df_all_sites)]
-  colnames(df_all_sites2) <- c(month.abb, "site", "dist")
   df_long <- gather(df_all_sites2, key = "Variable", value = "Value", -dist, -site)
-  df_long$Month <- factor(df_long$Variable, levels = m_list)
+  df_long$Month <- factor(df_long$Variable, levels = unique(df_long$Variable))
   
   return(df_long)
 }

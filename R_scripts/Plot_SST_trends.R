@@ -109,7 +109,7 @@ plot_sst_trend_maps <- function(masked_rast){
           panel.ontop = T,
           panel.background = element_rect(fill = NA),
           strip.background = element_rect(fill = "white"),
-          legend.position = "bottom", legend.key.width = unit(0.5, "inches"))+
+          legend.position = "bottom", legend.key.width = unit(0.35, "inches"))+ # change scalebar length
     annotation_scale(location = 'bl')+
     annotation_north_arrow(location = 'bl', height = unit(0.75, "cm"), width = unit(0.75,"cm"),
                            pad_x = unit(0.1, "in"), pad_y = unit(0.3, "in"))
@@ -144,7 +144,7 @@ plot_sst_anomaly_maps <- function(masked_rast){
           panel.ontop = T,
           panel.background = element_rect(fill = NA),
           strip.background = element_rect(fill = "white"),
-          legend.position = "bottom", legend.key.width = unit(0.5, "inches"))+
+          legend.position = "bottom", legend.key.width = unit(0.35, "inches"))+ #change scalebar length
     annotation_scale(location = 'bl')+
     annotation_north_arrow(location = 'bl', height = unit(0.75, "cm"), width = unit(0.75,"cm"), 
                            pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in")) 
