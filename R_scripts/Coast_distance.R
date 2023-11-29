@@ -73,7 +73,7 @@ coast_distance_slope <- function(m_list){
     
       dif <- st_difference(buf_2, buf_1)
     
-      masked_slope <- mask(masked_rast[[i]], dif)
+      masked_slope <- mask(masked_rast[[m]], dif)
       mean_slope[i] <- mean(masked_slope[,,1], na.rm = T)
     }
     monthly_df[,m] <- mean_slope
