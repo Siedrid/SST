@@ -266,6 +266,7 @@ if __name__ == '__main__':
     tl_crop = tl3_analysis_toolbox.crop()
     prep=tl3_analysis_toolbox.l3_lst_sst_prep()
     
+    '''
     path_in = 'E:/TIMELINE_SST/OUT/results/V2/'
     path_cci= 'E:/TIMELINE_SST/CCI/'
     plt_path = 'E:/TIMELINE_SST/OUT/Plots/mosaics/'
@@ -275,6 +276,17 @@ if __name__ == '__main__':
     
     ocean_path = "E:/TIMELINE_SST/GIS/World_Seas_IHO_v3/"
     shp_path = 'E:/TIMELINE_SST/GIS/sst_analysis_polygons/'
+    all_shp = shp_path + 'intersting_sst_analysis.shp'
+    '''
+    path_in = '/nfs/IGARSS_2022/Results_Laura/Monthly_Results/'
+    path_cci= '/nfs/data_ltdr/sst/ESACCI-L4_GHRSST_anomaly/'
+    plt_path = '/nfs/IGARSS_2022/Results_Laura/Plots/'
+    path_out = '/nfs/IGARSS_2022/Results_Laura/Plots/'
+    
+    tile_list_path = "/nfs/IGARSS_2022/Results_Laura/to_process/"
+    
+    ocean_path = "/nfs/IGARSS_2022/Results_Laura/Shps/"
+    shp_path = '/nfs/IGARSS_2022/Results_Laura/Shps/'
     all_shp = shp_path + 'intersting_sst_analysis.shp'
     
     study_areas = {

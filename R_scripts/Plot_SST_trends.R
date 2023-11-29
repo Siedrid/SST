@@ -153,16 +153,26 @@ plot_sst_anomaly_maps <- function(masked_rast){
 }
 # Main Workflow-----
 
-setwd("E:/TIMELINE_SST/")
-mosaic_path <- "OUT/Mosaics/" #path_out von Mosaic.py mit Unterordnern "Skagerrak", Adriatic_Sea", etc.
-plt_path = "Maps/" # Pfad, wo Plots gespeichert werden
+# setwd("E:/TIMELINE_SST/")
+# mosaic_path <- "OUT/Mosaics/" #path_out von Mosaic.py mit Unterordnern "Skagerrak", Adriatic_Sea", etc.
+# plt_path = "Maps/" # Pfad, wo Plots gespeichert werden
+# 
+# # Shape Paths
+# shp_path <- "GIS/Europe/Europe.gpkg"
+# africa_path <- "GIS/Africa/afr_g2014_2013_0.shp"
+# study_site <- "GIS/sst_analysis_polygons/study_area.shp"
+# poly_path <- "GIS/sst_analysis_polygons/intersting_sst_analysis.shp"
+# ocean_path <- "GIS/World_Seas_IHO_v3/"
+
+plt_path = "E:/Publications/SST_analysis/Test/"
+mosaic_path <- "E:/Publications/SST_analysis/Mosaics/New/"
 
 # Shape Paths
-shp_path <- "GIS/Europe/Europe.gpkg"
-africa_path <- "GIS/Africa/afr_g2014_2013_0.shp"
-study_site <- "GIS/sst_analysis_polygons/study_area.shp"
-poly_path <- "GIS/sst_analysis_polygons/intersting_sst_analysis.shp"
-ocean_path <- "GIS/World_Seas_IHO_v3/"
+shp_path <- "E:/Publications/SST_analysis/GIS Projekt/Europe.gpkg"
+africa_path <- "E:/Publications/SST_analysis/GIS Projekt/Africa/Africa/afr_g2014_2013_0.shp"
+study_site <- "E:/Publications/SST_analysis/GIS Projekt/study_area/study_area.shp"
+poly_path <- "E:/SST_Analysis/Shapes/intersting_sst_analysis.shp"
+ocean_path <- "E:/Conferences_Presentations/Strukturkommision_2022/Folien/World_Seas_IHO_v3/World_Seas_IHO_v3/"
 
 # path to tile lists
 tile_path <- "E:/TIMELINE_SST/Tile_Lists/"

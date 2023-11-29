@@ -124,14 +124,22 @@ plot_coast_dist <- function(df_long){
 
 # Main Workflow ----
 
-setwd("E:/TIMELINE_SST/")
-shp_path <- "GIS/Europe/Europe.gpkg"
-ocean_path <- "GIS/World_Seas_IHO_v3/"
+# setwd("E:/TIMELINE_SST/")
+# shp_path <- "GIS/Europe/Europe.gpkg"
+# ocean_path <- "GIS/World_Seas_IHO_v3/"
+# 
+# plt_path = "OUT/Plots/Coast_distance/"
+# path_out = "GIS/coast_dist/" # directory to write output csv files to
+# mosaic_path <- "OUT/Mosaics/" #path_out von Mosaic.py mit Unterordnern "Skagerrak", Adriatic_Sea", etc.
+# tile_path <- "E:/TIMELINE_SST/Tile_Lists/"
 
-plt_path = "OUT/Plots/Coast_distance/"
-path_out = "GIS/coast_dist/" # directory to write output csv files to
-mosaic_path <- "OUT/Mosaics/" #path_out von Mosaic.py mit Unterordnern "Skagerrak", Adriatic_Sea", etc.
-tile_path <- "E:/TIMELINE_SST/Tile_Lists/"
+shp_path <- "E:/Publications/SST_analysis/GIS Projekt/Europe.gpkg"
+ocean_path <- "E:/Conferences_Presentations/Strukturkommision_2022/Folien/World_Seas_IHO_v3/World_Seas_IHO_v3/"
+
+plt_path = "E:/Publications/SST_analysis/Test/"
+path_out = "E:/Publications/SST_analysis/Test/"
+mosaic_path <- "E:/Publications/SST_analysis/Mosaics/New/"
+tile_path <- "E:/Publications/SST_analysis/to_process/"
 
 A = c('Skagerrak', 'Kattegat', 'Baltic Sea', 'North Sea')
 B = 'Adriatic Sea'

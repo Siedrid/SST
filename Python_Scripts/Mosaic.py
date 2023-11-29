@@ -208,12 +208,19 @@ if __name__ == '__main__':
     
     reproj=tl3_analysis_toolbox.reproj()
     tl_crop = tl3_analysis_toolbox.crop()
-    
+    '''
     path_in = 'E:/TIMELINE_SST/OUT/results/V2/'
     path_out = 'E:/TIMELINE_SST/OUT/Mosaics/'
     tile_list_path = "E:/TIMELINE_SST/Tile_Lists/"
     
     shp_path = 'E:/TIMELINE_SST/GIS/sst_analysis_polygons/'
+    all_shp = shp_path + 'intersting_sst_analysis.shp'
+    '''
+    path_in = 'E:/Publications/SST_analysis/Results/V1/'
+    path_out = 'E:/Publications/SST_analysis/Mosaics/New/'
+    tile_list_path = "E:/Publications/SST_analysis/to_process/"
+    
+    shp_path = 'E:/SST_Analysis/Shapes/'
     all_shp = shp_path + 'intersting_sst_analysis.shp'
     
     study_areas = {
