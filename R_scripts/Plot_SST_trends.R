@@ -46,7 +46,7 @@ load_shp <- function(shp_path){
 
 
 # create SpatRaster
-stack_lst <- function(short, mosaic, layer){
+stack_lst <- function(short, mosaic, year, layer){
   # by default the year 2022 is used for the anomaly rasters, and the respective file name
   # Mosaic stands for either "MK" or "Dif", MK ds with the layers "slope" and "p" respectively,
   # or Anomaly ds with layer "obs_count" and "sst_dif_max"
@@ -57,7 +57,7 @@ stack_lst <- function(short, mosaic, layer){
       mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_mk_", short, ".nc")
       r_list[[m]] <- terra::rast(mosaic_name, lyrs = layer)
     } else if (mosaic == "Dif"){
-      mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_dif_2022_", short, ".nc")
+      mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_dif_",year,"_", short, ".nc")
       r_list[[m]] <- terra::rast(mosaic_name, lyrs = layer)
     } else {
       print("Variable mosaic must be either MK or Dif")
@@ -117,7 +117,7 @@ plot_sst_trend_maps <- function(masked_rast){
   ggsave(paste0(plt_path, short, '_anomaly_trends.png'), g, width = 20, height = 30, units = "cm")
 }
 
-plot_sst_anomaly_maps <- function(masked_rast){
+plot_sst_anomaly_maps <- function(masked_rast,year){
   
   g <- ggplot()+
     geom_spatraster(data = masked_rast)+
@@ -135,7 +135,7 @@ plot_sst_anomaly_maps <- function(masked_rast){
     coord_sf(xlim = c(bb[1],bb[3]), ylim=c(bb[2],bb[4]), expand = F)+
     xlab("Longitude")+
     ylab("Latitude")+
-    ggtitle("SST anomalies in 2022")+
+    ggtitle(paste0("SST anomalies in ",year))+
     scale_y_continuous(breaks = seq(30,65, by = 2))+
     scale_x_continuous(breaks = seq(-15,40, by = 2))+ 
     # Grid theme:
@@ -149,7 +149,7 @@ plot_sst_anomaly_maps <- function(masked_rast){
     annotation_north_arrow(location = 'bl', height = unit(0.75, "cm"), width = unit(0.75,"cm"), 
                            pad_x = unit(0.1, "in"), pad_y = unit(0.2, "in")) 
   
-  ggsave(paste0(plt_path, short, '_anomalies.png'), g, width = 20, height = 30, units = "cm")
+  ggsave(paste0(plt_path, short,'_',year, '_anomalies.png'), g, width = 20, height = 30, units = "cm")
 }
 # Main Workflow-----
 
@@ -175,7 +175,7 @@ poly_path <- "E:/SST_Analysis/Shapes/intersting_sst_analysis.shp"
 ocean_path <- "E:/Conferences_Presentations/Strukturkommision_2022/Folien/World_Seas_IHO_v3/World_Seas_IHO_v3/"
 
 # path to tile lists
-tile_path <- "E:/TIMELINE_SST/Tile_Lists/"
+tile_path <- "E:/Publications/SST_analysis/to_process/"
 
 # Transform Shapefiles
 europe <- load_shp(shp_path)
@@ -190,6 +190,8 @@ E = 'Balearic (Iberian Sea)'
 
 study_areas <- list(A,B,D,E)
 
+year <- "2013"
+
 for (i in 1:length(study_areas)){
   ocean_name <- study_areas[[i]]
   
@@ -202,10 +204,10 @@ for (i in 1:length(study_areas)){
   masked_rast_mk <- mask_IHO(r_c_mk, bb, roi)
   oc <- crop_ocean(ocean_name,bb)
   
-  r_c_dif <- stack_lst(short, 'Dif', layer = 'sst_dif_max')
-  masked_ras_dif <- mask_IHO(r_c_dif, bb, roi)
+  r_c_dif <- stack_lst(short, 'Dif', year, layer = 'sst_dif_max')
+  masked_rast_dif <- mask_IHO(r_c_dif, bb, roi)
   
   plot_sst_trend_maps(masked_rast_mk)
-  plot_sst_anomaly_maps(masked_rast_dif)
+  plot_sst_anomaly_maps(masked_rast_dif,year)
   
 }
