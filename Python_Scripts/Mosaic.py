@@ -195,7 +195,7 @@ def mosaic_anomalies(IHO_name, year):
         
         # Write to netCDF
         print('Write ...')        
-        outfile= p + str(month).zfill(2) + '_merged_mosaic_dif_2022_' + short + '.nc'        
+        outfile= p + str(month).zfill(2) + '_merged_mosaic_dif_'+str(year)+'_' + short + '.nc'        
         write_nc(monthly_dif, outfile)
     
         print('Closing Datasets ...')
@@ -241,5 +241,5 @@ if __name__ == '__main__':
         if not os.path.exists(p):
             os.makedirs(p)    
             
-        mosaic_mk(IHO_name)
-        mosaic_anomalies(IHO_name, 2022)
+        #mosaic_mk(IHO_name)
+        mosaic_anomalies(IHO_name, 2013)

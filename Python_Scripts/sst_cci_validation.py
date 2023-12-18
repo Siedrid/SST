@@ -20,6 +20,7 @@ import gc
 from datetime import datetime
 import pandas as pd
 from sklearn.linear_model import LinearRegression
+import pdb
 
 def write_nc(xds, fn):
     '''
@@ -93,7 +94,7 @@ def write_sst_ts(df, short):
 
 def load_sst_ts(short):
 
-    df = pd.read_csv(path_out + short + '/' + short + '_sst_cci-2022.csv')
+    df = pd.read_csv(path_out + short + '/' + short + '_sst_cci-v2.csv')
     df['datetime']=df.Date.apply(lambda x: datetime(int(x[0:4]),int(x[5:7]),int(x[8:10])))
     df['med_sst'] = df.med_sst.interpolate()
     df = df.set_index(df.datetime)
@@ -165,7 +166,7 @@ def sst_timeseries(IHO_name):
             if y >= 2017:
                 med_sst_cci.append(np.nan)
                 
-    df = pd.DataFrame({'Date': dates, 'tl_sst': med_sst, 'cci_sst': med_sst_cci, 'obs': obs_count})
+    df = pd.DataFrame({'Date': dates, 'med_sst': med_sst, 'cci_sst': med_sst_cci, 'obs': obs_count})
     
     return df
         
@@ -183,13 +184,16 @@ def get_linear_trend(data):
     yr_tr_tl=float(model.coef_*12)
     
     # CCI
-    arr=np.array(data['roll_mean_cci'].fillna(method='bfill').fillna(method='ffill'))
-    rows=np.arange(len(data))
-    model=LinearRegression()
-    model.fit(rows.reshape(-1,1),arr.reshape(-1,1))
-    linear=model.predict(rows.reshape(-1,1))
-    data['lin_tr_cci']=linear.reshape(len(linear))
-    yr_tr_cci=float(model.coef_*12)
+    if 'roll_mean_cci' in list(data.keys()):
+        arr=np.array(data['roll_mean_cci'].fillna(method='bfill').fillna(method='ffill'))
+        rows=np.arange(len(data))
+        model=LinearRegression()
+        model.fit(rows.reshape(-1,1),arr.reshape(-1,1))
+        linear=model.predict(rows.reshape(-1,1))
+        data['lin_tr_cci']=linear.reshape(len(linear))
+        yr_tr_cci=float(model.coef_*12)
+    else:
+        yr_tr_cci=np.nan
     
     return data, yr_tr_tl, yr_tr_cci
 
