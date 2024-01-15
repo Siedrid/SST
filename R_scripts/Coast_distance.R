@@ -38,14 +38,22 @@ load_shp <- function(shp_path){
 
 # create SpatRaster from MK datasets, layer = slope
 stack_lst <- function(short){
+  # Read Statistic of valid trends observations
+  trend_stats <- read.csv("E:/Publications/SST_analysis/Stats/stats_trend.csv")
+  threshold<-10
   r_list <- list()
+  month_list <- c()
   for (m in 1:12){
-    m_str <- sprintf("%02d", m)
-    mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_mk_", short, ".nc")
-    r_list[[m]] <- terra::rast(mosaic_name, lyrs = 'slope')
+    perc_valid<-as.numeric(trend_stats[trend_stats$short == short & trend_stats$month==m,]['percent'])
+    if (perc_valid > threshold){
+      m_str <- sprintf("%02d", m)
+      mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_mk_", short, ".nc")
+      r_list[[m]] <- terra::rast(mosaic_name, lyrs = 'slope')
+      month_list<-c(month_list,m)
+    }
   }
   r_c <- terra::rast(r_list)
-  names(r_c) <- month.abb
+  names(r_c) <- month.abb[month_list]
   return(r_c)
 }
 
@@ -62,12 +70,14 @@ coast_distance_slope <- function(m_list){
 
   europe_cropped <- sf::st_crop(europe, bb)
   
-  for (m in 1:length(m_list)){
+  #for (m in 1:length(m_list)){
+  for (m in names(masked_rast)){
     
-    print(paste(m_list[m], "beeing processed"))
+    print(paste(m, "beeing processed"))
     mean_slope <- rep(NaN, 50)
     
     for (i in c(1:50)){
+      print(paste(i, "km buffer beeing processed"))
       buf_2 <- st_buffer(europe_cropped, 1000 * i)
       buf_1 <- st_buffer(europe_cropped, 1000 * (i-1))
     
@@ -90,7 +100,7 @@ write_coast_dist <- function(monthly_df){
 
 load_coast_dist <- function(study_areas){
   short <- study_areas[[1]][1] %>% get_short()
-  df_all_sites <- read.csv(paste0(path_out, short, "_coast_dist-v3.csv"))
+  df_all_sites <- read.csv(paste0(path_out, short, "_coast_dist.csv"))
   df_all_sites$site <- rep(short, nrow(df_all_sites))
   df_all_sites$dist <- c(1:50)
   
@@ -112,13 +122,15 @@ load_coast_dist <- function(study_areas){
 
 # Create a line plot for each column using facet_wrap
 plot_coast_dist <- function(df_long){
+  df_long$Value<-df_long$Value*10
   g <- ggplot(df_long, aes(x = dist, y = Value, color = Month)) +
   geom_line() +
   facet_wrap(~ site, scales = "free_y") +
   labs(title ="Senn's Slope vs. Coast Distance")+
   xlab("Distance [km]")+
-  ylab("Slope [K/year]")+
-  guides(fill=guide_legend(title="Month"))
+  ylab("Slope [K/decade]")+
+  guides(fill=guide_legend(title="Month"))+
+  ylim(-0.5, 1)
   ggsave(paste0(plt_path, 'coast_dist.png'))
 }
 
@@ -136,9 +148,10 @@ plot_coast_dist <- function(df_long){
 shp_path <- "E:/Publications/SST_analysis/GIS Projekt/Europe.gpkg"
 ocean_path <- "E:/Conferences_Presentations/Strukturkommision_2022/Folien/World_Seas_IHO_v3/World_Seas_IHO_v3/"
 
-plt_path = "E:/Publications/SST_analysis/Test/"
-path_out = "E:/Publications/SST_analysis/Test/"
-mosaic_path <- "E:/Publications/SST_analysis/Mosaics/New/"
+plt_path = "E:/Publications/SST_analysis/Figures/Figure11/new_test/"
+path_out = "E:/Publications/SST_analysis/Figures/Figure11/new_test/"
+#mosaic_path <- "E:/Publications/SST_analysis/Mosaics/New/"
+mosaic_path <- "E:/Publications/SST_analysis/Mosaics/cropped_mk/"
 tile_path <- "E:/Publications/SST_analysis/to_process/"
 
 A = c('Skagerrak', 'Kattegat', 'Baltic Sea', 'North Sea')
@@ -162,8 +175,9 @@ for (i in 1:length(study_areas)){
   bb <- get_bb_list(tile_df)
   short <- get_short(ocean_name[1])
   
-  r_c <- stack_lst(short)
-  masked_rast <- mask_IHO(r_c, bb, roi)
+  #r_c <- stack_lst(short)
+  #masked_rast <- mask_IHO(r_c, bb, roi)
+  masked_rast <- stack_lst(short)
   
   monthly_df <- coast_distance_slope(m_list)
   write_coast_dist(monthly_df)

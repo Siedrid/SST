@@ -64,6 +64,14 @@ def missing_polys(all_shp, path_in):
     result = list(poly_lst_shp - poly_lst)
     return result
 
+def get_shp_new(all_shp,IHO_name):
+    ocean_shp = gpd.read_file(all_shp)
+    sel_ocean = ocean_shp.loc[ocean_shp['NAME'] == IHO_name]
+    geometry = sel_ocean.geometry
+    return geometry
+    
+    
+
 def get_cci_shp(all_shp, IHO_name, crop2IHO = False):
     
     poly_lst = read_tile_lst(IHO_name)    
@@ -98,6 +106,7 @@ def load_sst_ts(short):
     df['datetime']=df.Date.apply(lambda x: datetime(int(x[0:4]),int(x[5:7]),int(x[8:10])))
     df['med_sst'] = df.med_sst.interpolate()
     df = df.set_index(df.datetime)
+
     return df
 
 def get_site_letter(IHO_name):
@@ -111,7 +120,8 @@ def get_site_letter(IHO_name):
 
 def sst_timeseries(IHO_name):
     
-    geometry, poly_lst = get_cci_shp(all_shp, IHO_name, crop2IHO=False)
+    #geometry, poly_lst = get_cci_shp(all_shp, IHO_name, crop2IHO=False)
+    geometry = get_shp_new(all_shp, IHO_name)
    
     dates = []
     med_sst = []
@@ -119,9 +129,9 @@ def sst_timeseries(IHO_name):
     med_sst_cci = []
     
     for month in range(1,13):
-        
+    #for month in [1,2]:    
         print('Mosaicing month ' + str(month))
-        
+        '''
         dif_lst = [path_in + poly_id + '_' + str(month).zfill(2) + '_monthly_dif.nc' for poly_id in poly_lst]        
         dif_lst_sort = []
         
@@ -132,42 +142,44 @@ def sst_timeseries(IHO_name):
                 print(poly_lst[i] + ' missing in input folder')       
         
         dif_ds = [xr.open_dataset(dif_lst_sort[i]) for i in range(len(dif_lst_sort))]
-
+        '''
         for y in range(1990, 2023):
-            
-            # Median per Polygon
-            med = [dif_ds[d].sst_dif_max.sel(year = y).median().values for d in range(len(dif_lst_sort)) if y in dif_ds[d].year]
-            # Median over all Polygons
-            med_sst.append(np.nanmedian(med))
-            
-            # Sum observations
-            obs = [dif_ds[d].obs_count.sel(year = y).sum().values for d in range(len(dif_lst_sort)) if y in dif_ds[d].year]
-            obs_count.append(sum(obs))
-            
-            dates.append(datetime.strptime(str(y)+ '-' + str(month).zfill(2)+'-01', "%Y-%m-%d"))
-
-            if y < 2017:                
-                print('Compositing '+str(y)+ '-' + str(month).zfill(2))
-                fs_cci=[path_cci + f for f in os.listdir(path_cci) if (f[4:6]==str(month).zfill(2)) and (f[0:4]==str(y)) and ('CDR2.1_anomaly-v02.0' in f)]
-                ds_cci=xr.open_mfdataset(fs_cci,chunks={'x': 2300, 'y': 3250},preprocess=prep.add_date)
+        #for y in [1990]:
+            infile=path_in+short+'/'+str(month).zfill(2) + '_merged_mosaic_dif_'+str(y)+'_' + short + '.nc'
+            if os.path.isfile(infile):
+                ds=xr.open_dataset(infile)
+                # Median for study area
+                med_sst.append(np.nanmedian(ds.sst_dif_max))
                 
-                xds_cci=xr.Dataset(coords={'lat':ds_cci.coords['lat'],'lon':ds_cci.coords['lon']},
-                                       attrs=ds_cci.attrs)
-                
-                # Calculate monthly median CCI composite from daily data
-                xds_cci['sst_cci_anom']=ds_cci['analysed_sst_anomaly'].mean(dim='time')
-                xds_cci.coords['t'] = y
-        
-                xds_cci = xds_cci.rio.write_crs("epsg:4326", inplace = True)
-                print('Crop to Polygon')
-                xds_cci_cropped = xds_cci.rio.clip([geometry])
-                med_sst_cci.append(np.nanmedian(xds_cci_cropped.sst_cci_anom))
-                                
-            if y >= 2017:
-                med_sst_cci.append(np.nan)
+                # Sum observations
+                obs_count.append(int(np.sum(ds.obs_count)))
+             
+                dates.append(datetime.strptime(str(y)+ '-' + str(month).zfill(2)+'-01', "%Y-%m-%d"))
+               
+                if y < 2017:                
+                    print('Compositing '+str(y)+ '-' + str(month).zfill(2))
+                    fs_cci=[path_cci + f for f in os.listdir(path_cci) if (f[4:6]==str(month).zfill(2)) and (f[0:4]==str(y)) and ('CDR2.1_anomaly-v02.0' in f)]
+                    ds_cci=xr.open_mfdataset(fs_cci,chunks={'x': 2300, 'y': 3250},preprocess=prep.add_date)
+                    
+                    xds_cci=xr.Dataset(coords={'lat':ds_cci.coords['lat'],'lon':ds_cci.coords['lon']},
+                                           attrs=ds_cci.attrs)
+                    
+                    # Calculate monthly median CCI composite from daily data
+                    xds_cci['sst_cci_anom']=ds_cci['analysed_sst_anomaly'].mean(dim='time')
+                    xds_cci.coords['t'] = y
+            
+                    xds_cci = xds_cci.rio.write_crs("epsg:4326", inplace = True)
+                    print('Crop to Polygon')
+                   
+                    #xds_cci_cropped = xds_cci.rio.clip([geometry])
+                    xds_cci_cropped = xds_cci.rio.clip(geometry)
+                    med_sst_cci.append(np.nanmedian(xds_cci_cropped.sst_cci_anom))
+                                    
+                if y >= 2017:
+                    med_sst_cci.append(np.nan)
                 
     df = pd.DataFrame({'Date': dates, 'med_sst': med_sst, 'cci_sst': med_sst_cci, 'obs': obs_count})
-    
+  
     return df
         
 #%% load csv Data
@@ -181,7 +193,7 @@ def get_linear_trend(data):
     model.fit(rows.reshape(-1,1),arr.reshape(-1,1))
     linear=model.predict(rows.reshape(-1,1))
     data['lin_tr_tl']=linear.reshape(len(linear))
-    yr_tr_tl=float(model.coef_*12)
+    yr_tr_tl=float(model.coef_*120)
     
     # CCI
     if 'roll_mean_cci' in list(data.keys()):
@@ -191,7 +203,7 @@ def get_linear_trend(data):
         model.fit(rows.reshape(-1,1),arr.reshape(-1,1))
         linear=model.predict(rows.reshape(-1,1))
         data['lin_tr_cci']=linear.reshape(len(linear))
-        yr_tr_cci=float(model.coef_*12)
+        yr_tr_cci=float(model.coef_*120)
     else:
         yr_tr_cci=np.nan
     
@@ -200,7 +212,8 @@ def get_linear_trend(data):
 # Plot anomalies
 def plot_anomalies(df, site_letter):
     
-    df = load_sst_ts(short)
+    #df = load_sst_ts(short)
+    df=df[np.isfinite(df.cci_sst)]
     
     # Calculate Rolling Mean
     df['roll_mean_tl'] = df['med_sst'].rolling(12,min_periods=1).mean()
@@ -215,14 +228,18 @@ def plot_anomalies(df, site_letter):
     ax.axhline(y = 0, color = 'black')
     ax.plot(df.datetime, df.roll_mean_tl,color='black',linewidth=6,label='TIMELINE 1-year moving mean')
     ax.plot(df.datetime, df.roll_mean_cci,color='green',linewidth=6,label='CCI 1-year moving mean')
-    ax.plot(df.datetime, df.lin_tr_tl, color='black',linewidth=2,linestyle='--', label = 'TL Linear Trend')
-    ax.plot(df.datetime, df.lin_tr_cci, color = 'grey', linewidth=2, linestyle = '--', label = 'CCI Linear Trend')
+    ax.plot(df.datetime, df.lin_tr_tl, color='black',linewidth=6,linestyle='--', label = 'TL Linear Trend')
+    ax.plot(df.datetime, df.lin_tr_cci, color = 'green', linewidth=6, linestyle = '--', label = 'CCI Linear Trend')
+    
+    ax.text(df.datetime[10], 2.5, 'TIMELINE Trend ('+str(round(yr_tr_tl,2))+' K/decade)', fontsize = 40)
+    ax.text(df.datetime[10], 2.0, 'CCI Trend ('+str(round(yr_tr_cci,2))+' K/decade)', fontsize = 40)
     
     fontsize=40
     ax.tick_params(labelsize=fontsize)
     ax.set_xlabel('Year',fontsize=fontsize)
     ax.set_ylabel('SST anomalies [K]',fontsize=fontsize)
     ax.set_ylim(-3,3)
+    ax.set_xlim(datetime(1989,12,1),datetime(2017,2,1))
     ax.legend(fontsize = fontsize -10, markerscale = 1.2, loc = 'lower right')
     ax.set_title('SST anomalies for ' + site_letter, fontsize = fontsize)
     ax.grid()
@@ -249,14 +266,15 @@ def plot_TL_anomalies(df, site_letter):
     ax.bar(data_neg.datetime,data_neg['med_sst'],width=30,color='blue',alpha=0.7,label='TIMELINE anomalies (negative)')
     
     ax.plot(df.datetime, df.roll_mean_tl,color='black',linewidth=6,label='TIMELINE 1-year moving mean')
-    ax.plot(df.datetime, df.lin_tr_tl, color='black',linewidth=2,linestyle='--')
-    ax.text(df.datetime[10], 2.5, 'Linear Trend ('+str(round(yr_tr_tl,2))+' K/a)', fontsize = 40)
+    ax.plot(df.datetime, df.lin_tr_tl, color='black',linewidth=6,linestyle='--')
+    ax.text(df.datetime[10], 2.5, 'Linear Trend ('+str(round(yr_tr_tl,2))+' K/decade)', fontsize = 40)
     
     fontsize=40
     ax.tick_params(labelsize=fontsize)
     ax.set_xlabel('Year',fontsize=fontsize)
     ax.set_ylabel('SST anomalies [K]',fontsize=fontsize)
     ax.set_ylim(-3,3)
+    ax.set_xlim(datetime(1989,12,1),datetime(2023,2,1))
     ax.legend(fontsize = fontsize -10, markerscale = 1.2, loc = 'lower right')
     ax.set_title('SST anomalies for ' + site_letter, fontsize = fontsize)
     ax.grid()
@@ -282,7 +300,7 @@ if __name__ == '__main__':
     shp_path = 'E:/TIMELINE_SST/GIS/sst_analysis_polygons/'
     all_shp = shp_path + 'intersting_sst_analysis.shp'
     '''
-    path_in = '/nfs/IGARSS_2022/Results_Laura/Monthly_Results/'
+    path_in = '/nfs/IGARSS_2022/Results_Laura/Composites/'
     path_cci= '/nfs/data_ltdr/sst/ESACCI-L4_GHRSST_anomaly/'
     plt_path = '/nfs/IGARSS_2022/Results_Laura/Plots/'
     path_out = '/nfs/IGARSS_2022/Results_Laura/Plots/'
@@ -291,21 +309,25 @@ if __name__ == '__main__':
     
     ocean_path = "/nfs/IGARSS_2022/Results_Laura/Shps/"
     shp_path = '/nfs/IGARSS_2022/Results_Laura/Shps/'
-    all_shp = shp_path + 'intersting_sst_analysis.shp'
+    #all_shp = shp_path + 'intersting_sst_analysis.shp'
+    all_shp = shp_path + 'final_areas.shp'
     
     study_areas = {
-        'Skagerrak': 'A',
+        #'Skagerrak': 'A',
         'Adriatic Sea': 'B',
         'Aegean Sea': 'C',
         'Balearic (Iberian Sea)': 'D'
         } 
     
     for key in study_areas.keys():
-        
+    #for key in ['Skagerrak']:
+        print('processing '+ key)
+
         IHO_name = key 
         short = short_from_IHO(IHO_name)
         
         plt_out = path_out + short + '/'
+       
         if not os.path.exists(plt_out):
             os.makedirs(plt_out)    
         

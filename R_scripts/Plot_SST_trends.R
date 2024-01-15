@@ -51,20 +51,24 @@ stack_lst <- function(short, mosaic, year, layer){
   # Mosaic stands for either "MK" or "Dif", MK ds with the layers "slope" and "p" respectively,
   # or Anomaly ds with layer "obs_count" and "sst_dif_max"
   r_list <- list()
-  for (m in 1:12){
+  #for (m in 1:12){
+  i=1
+  for (m in c(12,1,2,3,4,5,6,7,8,9,10,11)){
     m_str <- sprintf("%02d", m)
     if (mosaic == 'MK'){
       mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_mk_", short, ".nc")
-      r_list[[m]] <- terra::rast(mosaic_name, lyrs = layer)
+      r_list[[i]] <- terra::rast(mosaic_name, lyrs = layer)
     } else if (mosaic == "Dif"){
       mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_dif_",year,"_", short, ".nc")
       r_list[[m]] <- terra::rast(mosaic_name, lyrs = layer)
     } else {
       print("Variable mosaic must be either MK or Dif")
     }
+    i=i+1
   }
   r_c <- terra::rast(r_list)
-  names(r_c) <- month.abb
+  #names(r_c) <- month.abb
+  names(r_c) <- c("Dec","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov") 
   return(r_c)
 }
 
@@ -78,17 +82,19 @@ mask_IHO <- function(sp_raster, bb, roi){
 # background shapefile for remaining ocean not in study area
 crop_ocean <- function(ocean_name, bb){
   oc <- ocean_shp[!ocean_shp$NAME %in% ocean_name,] %>% st_crop(bb)
+  #oc <- ocean_shp %>% st_crop(bb)
+  #oc <- ocean_shp[!ocean_shp$NAME %in% ocean_name,]
   oc <- oc[oc$NAME != 'South Pacific Ocean',]
   return(oc)
 }
 
 plot_sst_trend_maps <- function(masked_rast){
-  
+  masked_rast<-masked_rast*10
   g <- ggplot()+
     geom_spatraster(data = masked_rast)+
     facet_wrap(~lyr, ncol = 3)+
     # Raster Legend:
-    scale_fill_gradientn(name = 'K/year', colours = rev(brewer.pal(9, 'Spectral')), na.value = 'white', limits = c(-0.1, 0.1))+
+    scale_fill_gradientn(name = 'K/decade', colours = rev(brewer.pal(9, 'Spectral')), na.value = 'white', limits = c(-1, 1))+
     new_scale_fill()+
     geom_sf(data = europe, aes(fill = 'light grey')) +
     geom_sf(data = oc, aes(fill = 'white'))+
@@ -164,7 +170,7 @@ plot_sst_anomaly_maps <- function(masked_rast,year){
 # poly_path <- "GIS/sst_analysis_polygons/intersting_sst_analysis.shp"
 # ocean_path <- "GIS/World_Seas_IHO_v3/"
 
-plt_path = "E:/Publications/SST_analysis/Test/"
+plt_path = "E:/Publications/SST_analysis/Figures_test/new_figures/"
 mosaic_path <- "E:/Publications/SST_analysis/Mosaics/New/"
 
 # Shape Paths
@@ -172,7 +178,9 @@ shp_path <- "E:/Publications/SST_analysis/GIS Projekt/Europe.gpkg"
 africa_path <- "E:/Publications/SST_analysis/GIS Projekt/Africa/Africa/afr_g2014_2013_0.shp"
 study_site <- "E:/Publications/SST_analysis/GIS Projekt/study_area/study_area.shp"
 poly_path <- "E:/SST_Analysis/Shapes/intersting_sst_analysis.shp"
-ocean_path <- "E:/Conferences_Presentations/Strukturkommision_2022/Folien/World_Seas_IHO_v3/World_Seas_IHO_v3/"
+#ocean_path <- "E:/Conferences_Presentations/Strukturkommision_2022/Folien/World_Seas_IHO_v3/World_Seas_IHO_v3/"
+ocean_path <- "E:/Publications/SST_analysis/Final_Study_Areas/World_Seas_Cropped/"
+final_path <- "E:/Publications/SST_analysis/Final_Study_Areas/Final_areas/"
 
 # path to tile lists
 tile_path <- "E:/Publications/SST_analysis/to_process/"
@@ -182,8 +190,9 @@ europe <- load_shp(shp_path)
 africa_shp <- load_shp(africa_path)
 ocean_shp <- load_shp(ocean_path)
 poly_shp <- load_shp(poly_path)
+final_area <- load_shp(final_path)
 
-A = c('Skagerrak', 'Kattegat', 'Baltic Sea', 'North Sea')
+A = c('Skagerrak', 'Kattegat')
 B = 'Adriatic Sea'
 D = c('Aegean Sea', 'Sea of Marmara')
 E = 'Balearic (Iberian Sea)'
@@ -196,13 +205,17 @@ for (i in 1:length(study_areas)){
   ocean_name <- study_areas[[i]]
   
   tile_df <- read_tile_lists(tile_path, ocean_name[1])
-  roi <- ocean_shp %>% filter(NAME %in% ocean_name)
+  #roi <- ocean_shp %>% filter(NAME %in% ocean_name)
+  roi <-final_area
   bb <- get_bb_list(tile_df)
+  
   short <- get_short(ocean_name[1])
   
   r_c_mk <- stack_lst(short, 'MK', layer = 'slope')
   masked_rast_mk <- mask_IHO(r_c_mk, bb, roi)
+  xmin <-bb['xmin']
   oc <- crop_ocean(ocean_name,bb)
+
   
   r_c_dif <- stack_lst(short, 'Dif', year, layer = 'sst_dif_max')
   masked_rast_dif <- mask_IHO(r_c_dif, bb, roi)

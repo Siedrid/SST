@@ -26,62 +26,35 @@ from rasterio.enums import Resampling
 
 class aux:
     #def get_l3_file_from_ida(self,date,temporal,product,version,tile):
-    def get_l3_file_from_ida(self,date_str,temporal,product,version,tile):    
-        path='E:/TIMELINE_SST/DATA' #ggf. anpassen!
+    def get_l3_file_from_ida(self,date,temporal,product,version,tile):    
+        path='/Timeline/IDA-mount/archive/AVHRR/L3/'
         v_string=version[0:3]+version[4:6]
         if temporal=='Daily' or temporal=='daily':
             temporal_str='daily'
-            filename='TL-L3-'+product+'-AVHRR_NOAA-'+date_str+'_'+temporal_str+'-f'+v_string+'_'+tile+'.nc'
+            filename='TL-L3-'+product+'-AVHRR_NOAA-'+date+'_'+temporal_str+'-f'+v_string+'_'+tile+'.nc'
         
         if temporal=='Decades' or  temporal=='decadal':
-            if int(date_str[6:8])<10:
+            if int(date[6:8])<10:
               temporal_str='decade1' 
-            elif int(date_str[6:8])>19:
+            elif int(date[6:8])>19:
               temporal_str='decade3'
             else:
               temporal_str='decade2'  
             
-            filename='TL-L3-'+product+'-AVHRR_NOAA-'+date_str[0:6]+'_'+temporal_str+'-f'+v_string+'_'+tile+'.nc'
+            filename='TL-L3-'+product+'-AVHRR_NOAA-'+date[0:6]+'_'+temporal_str+'-f'+v_string+'_'+tile+'.nc'
         
         if temporal=='Monthly' or temporal=="monthly":
             temporal_str='monthly'
-            filename='TL-L3-'+product+'-AVHRR_NOAA-'+date_str[0:6]+'_'+temporal_str+'-f'+v_string+'_'+tile+'.nc'
+            filename='TL-L3-'+product+'-AVHRR_NOAA-'+date[0:6]+'_'+temporal_str+'-f'+v_string+'_'+tile+'.nc'
             if product=='NDVI':
                 temporal=temporal_str
-        
-        file=os.path.join(path, date_str[0:4],date_str[4:6],temporal,filename)
-        #print(file)
-        # Tile/Year/Month/Daily/Filename
+        file=os.path.join(path, product, version,date[0:4],date[4:6],temporal,filename)
         if os.path.isfile(file):
             return file
         else:
-            print('Warning: '+date_str+' '+product+' '+temporal+' does not exist.')
+            print('Warning: '+date+' '+product+' '+temporal+' does not exist.')
             return None
-    
-    def get_l3_Decades_file_from_ida(self,date_str,dec_no,product,version,tile):
-        '''
-        For Decadal Data only
-        '''
-        path='D:/TIMELINE_SST/DATA'
-        v_string=version[0:3]+version[4:6]
-        temporal = 'Decades'
         
-        if dec_no == 1:
-          temporal_str='decade1' 
-        elif dec_no == 3:
-          temporal_str='decade3'
-        elif dec_no == 2:
-          temporal_str='decade2'  
-        
-        filename='TL-L3-'+product+'-AVHRR_NOAA-'+date_str[0:6]+'_'+temporal_str+'-f'+v_string+'_'+tile+'.nc'
-        file=os.path.join(path,tile, date_str[0:4],date_str[4:6],temporal,filename)
-        
-        if os.path.isfile(file):
-            return file
-        else:
-            print('Warning: '+date_str+' '+product+' '+temporal+' does not exist.')
-            return None         
-    
     def xds_to_df(self,xds,varlist):
         df=pd.DataFrame()
         for var in varlist:
@@ -132,6 +105,7 @@ class reproj:
         tiles=['t01','t02','t03','t04']
         for tile in tiles:
             outfile=outdir+'/'+os.path.splitext(fn)[0]+'_'+tile+'.tif'
+            pdb.set_trace()
             dsRes = gdal.Warp(outfile, dsReprj, xRes = 1000, yRes = 1000, 
                               resampleAlg=resampleAlg,outputBounds=tile_exts[tile])
             dsRes = None
@@ -208,7 +182,7 @@ class reproj:
         #xds_merged=xds_tl.merge(xds_cci)
         for var in list(xds_cci.variables):
             if len(xds_cci[var].shape)==3:
-                xds_lonlat[var]=(["year","y","x"],np.array(xds_cci[var])[:,:,:])
+                xds_lonlat[var]=(["y","x"],np.array(xds_cci[var])[0,:,:])
             if len(xds_cci[var].shape)==2:
                 xds_lonlat[var]=(["y","x"],np.array(xds_cci[var]))
         return xds_lonlat
@@ -218,12 +192,28 @@ class reproj:
 
 class l3_lst_sst_prep:
 
-    def add_date(self, ds):
+    def add_date(self,ds):
+        #add_date(self,ds): 
         if 'platform' in list(ds.coords.keys()):
-              ds=ds.reset_coords('platform')
+           ds=ds.reset_coords('platform')
         starttime=ds.attrs['time_coverage_start']
         date=datetime(int(starttime[0:4]),int(starttime[4:6]),int(starttime[6:8]))
         ds.coords['t']=date
+        return ds
+    
+    def add_date_and_pf(self,ds):
+        #add_date(self,ds): 
+        if 'platform' in list(ds.coords.keys()):
+           ds=ds.reset_coords('platform')
+        starttime=ds.attrs['time_coverage_start']
+        date=datetime(int(starttime[0:4]),int(starttime[4:6]),int(starttime[6:8]))
+        ds.coords['t']=date
+        ds.coords['pf1_day']=ds.lct1_day.attrs['platform']
+        ds.coords['pf2_day']=ds.lct2_day.attrs['platform']
+        ds.coords['pf3_day']=ds.lct3_day.attrs['platform']
+        ds.coords['pf1_night']=ds.lct1_night.attrs['platform']
+        ds.coords['pf2_night']=ds.lct2_night.attrs['platform']
+        ds.coords['pf3_night']=ds.lct3_night.attrs['platform']
         return ds
     
     def l3_lst_sst_prepare(self,xds):
@@ -352,7 +342,30 @@ class l3_lst_sst_prep:
         return xds
     
 class crop:
-    def create_mask_from_shp_tiles(self,geoms,tl):
+    
+    def create_mask_from_shp(self,polygon,mask_shape,coord_upper_left,resolution,epsg_poly,epsg_mask):
+        geoms=rasterio.warp.transform_geom('EPSG:'+epsg_poly,'EPSG:'+epsg_mask,[polygon['geometry']])
+        transform=from_origin(coord_upper_left[0],coord_upper_left[1] , resolution, resolution) 
+        arr = np.full((mask_shape[0], mask_shape[1]),fill_value=1, dtype="uint8") # Mask template 
+        # Create in memory rasterio ds
+        memfile=rasterio.io.MemoryFile()
+        dataset=memfile.open(
+            driver='GTiff',
+            height=arr.shape[0],
+            width=arr.shape[1],
+            count=1,
+            dtype=arr.dtype,
+            transform=transform,
+            crs=rasterio.crs.CRS.from_epsg(int(epsg_mask))
+        )
+        dataset.write(arr,1)
+        output, m_transform = rasterio.mask.mask(dataset, geoms)
+        dataset.close()
+        output=output.astype(float)
+        output[output==0]=np.nan
+        return output.squeeze(0)
+    
+    def create_mask_from_shp_tiles(self,geoms,ds):
         my_func_name='create_mask_from_shp_tiles'
         print(datetime.now().strftime("%H:%M:%S")+' '+my_func_name)
         tile_corn={
@@ -361,6 +374,7 @@ class crop:
             "t03":(899500,3200500),
             "t04":(4149500,3200500)
             }
+        pdb.set_trace()
         transform=from_origin(tile_corn[tl][0],tile_corn[tl][1] , 1000, 1000) # TL Coordinates upper left and pixel size (meters)
         arr = np.full((2300, 3250),fill_value=1, dtype="uint8") # Mask template shape of the TL extent
         # Create in memory rasterio ds
@@ -385,28 +399,15 @@ class crop:
         my_func_name='crop_ds_with_shp_tiles'
         print(datetime.now().strftime("%H:%M:%S")+' '+my_func_name)
         geoms=rasterio.warp.transform_geom('EPSG:4326','EPSG:3035',[shp['geometry']])
-        mask=self.create_mask_from_shp_tiles(geoms, tl)
+        pdb.set_trace()
+        mask=self.create_mask_from_shp_tiles(geoms, ds)
         for varname in list(ds.keys()):
             ds[varname]=ds[varname]*mask
         if crop==True:
             bounds=rasterio.features.bounds(geoms[0])
             ds=ds.sel(x=slice(bounds[0],bounds[2]),y=slice(bounds[3],bounds[1]))  
         return ds
-    '''    
-    def crop_ds_with_shp_tiles(self,ds,shp,crop,tl):
-        my_func_name='crop_ds_with_shp_tiles'
-        print(datetime.now().strftime("%H:%M:%S")+' '+my_func_name)
-        geoms=rasterio.warp.transform_geom('EPSG:4326','EPSG:3035',[shp['geometry']])
-        #
-        mask=self.create_mask_from_shp_tiles(geoms, tl)
-        for varname in list(ds.keys()):
-            ds[varname]=ds[varname]*mask
-        #
-        if crop==True:
-            bounds=rasterio.features.bounds(geoms[0])
-            ds=ds.sel(x=slice(bounds[0],bounds[2]),y=slice(bounds[3],bounds[1]))  
-        return ds
-    '''    
+    '''
     def create_mask_from_shp(self,geoms):   
         my_func_name='create_mask_from_shp'
         print(datetime.now().strftime("%H:%M:%S")+' '+my_func_name)
@@ -427,7 +428,7 @@ class crop:
         output, m_transform = rasterio.mask.mask(dataset, geoms)
         dataset.close()
         return output.squeeze(0)
-    
+    '''
     def crop_ds_with_shp(self,ds,shp,crop):
         my_func_name='crop_ds_with_shp'
         print(datetime.now().strftime("%H:%M:%S")+' '+my_func_name)
@@ -435,7 +436,6 @@ class crop:
         mask=self.create_mask_from_shp(geoms)
         for varname in list(ds.keys()):
             ds[varname]=ds[varname]*mask
-    
         if crop==True:
             bounds=rasterio.features.bounds(geoms[0])
             ds=ds.sel(x=slice(bounds[0],bounds[2]),y=slice(bounds[3],bounds[1]))  
@@ -494,6 +494,29 @@ class crop:
         for var in variables:
             stats.append(xds_pnt[var].values)
         df=pd.DataFrame(data=np.transpose(stats),columns=variables)
+        #df=pd.DataFrame(data=np.transpose(stats),columns=variables)
+        return df
+    
+    def get_vars_by_coords_buffer(self,xds,variables,lat,lon,buffer):
+        my_func_name='get_vars_by_coords_buffer'
+        print(datetime.now().strftime("%H:%M:%S")+' '+my_func_name)
+        xds_pnt=xds.where((xds.x>(lon-buffer*1000))&(xds.x<(lon+buffer*1000))&
+                  (xds.y>(lat-buffer*1000))&(xds.y<(lat+buffer*1000)),drop=True)
+        stats=[]
+        varnames=[]
+        for var in variables:
+            values=xds_pnt[var].values
+            var_mean=np.nanmean(values,axis=(1,2))
+            var_std=np.nanstd(values,axis=(1,2))
+            var_val=(np.count_nonzero(~np.isnan(values),axis=(1,2))/float(values.shape[1]*values.shape[2]))*100
+            stats.append(var_mean)
+            stats.append(var_std)
+            stats.append(var_val)
+            varnames.append(var)
+            varnames.append(var+'_std')
+            varnames.append(var+'_percval')
+            #stats.append(xds_pnt[var].values)
+        df=pd.DataFrame(data=np.transpose(stats),columns=varnames)
         #df=pd.DataFrame(data=np.transpose(stats),columns=variables)
         return df
         
