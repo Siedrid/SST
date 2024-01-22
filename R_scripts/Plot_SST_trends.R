@@ -56,10 +56,11 @@ stack_lst <- function(short, mosaic, year, layer){
   for (m in c(12,1,2,3,4,5,6,7,8,9,10,11)){
     m_str <- sprintf("%02d", m)
     if (mosaic == 'MK'){
+      #mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_mk_", short, "_median.nc")
       mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_mk_", short, ".nc")
       r_list[[i]] <- terra::rast(mosaic_name, lyrs = layer)
     } else if (mosaic == "Dif"){
-      mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_dif_",year,"_", short, ".nc")
+      mosaic_name <- paste0(mosaic_path, short, '/', m_str, "_merged_mosaic_dif_",year,"_", short, "_median.nc")
       r_list[[m]] <- terra::rast(mosaic_name, lyrs = layer)
     } else {
       print("Variable mosaic must be either MK or Dif")
@@ -170,8 +171,9 @@ plot_sst_anomaly_maps <- function(masked_rast,year){
 # poly_path <- "GIS/sst_analysis_polygons/intersting_sst_analysis.shp"
 # ocean_path <- "GIS/World_Seas_IHO_v3/"
 
-plt_path = "E:/Publications/SST_analysis/Figures_test/new_figures/"
-mosaic_path <- "E:/Publications/SST_analysis/Mosaics/New/"
+plt_path = "E:/Publications/SST_analysis/Figures_test/new_figures/max/"
+#mosaic_path <- "E:/Publications/SST_analysis/Mosaics/Median/"
+mosaic_path <- "E:/Publications/SST_analysis/Mosaics/cropped_mk/"
 
 # Shape Paths
 shp_path <- "E:/Publications/SST_analysis/GIS Projekt/Europe.gpkg"
@@ -197,7 +199,8 @@ B = 'Adriatic Sea'
 D = c('Aegean Sea', 'Sea of Marmara')
 E = 'Balearic (Iberian Sea)'
 
-study_areas <- list(A,B,D,E)
+#study_areas <- list(A,B,D,E)
+study_areas <- list(B,E)
 
 year <- "2013"
 
@@ -217,10 +220,10 @@ for (i in 1:length(study_areas)){
   oc <- crop_ocean(ocean_name,bb)
 
   
-  r_c_dif <- stack_lst(short, 'Dif', year, layer = 'sst_dif_max')
-  masked_rast_dif <- mask_IHO(r_c_dif, bb, roi)
+  #r_c_dif <- stack_lst(short, 'Dif', year, layer = 'sst_dif_med')
+  #masked_rast_dif <- mask_IHO(r_c_dif, bb, roi)
   
   plot_sst_trend_maps(masked_rast_mk)
-  plot_sst_anomaly_maps(masked_rast_dif,year)
+  #plot_sst_anomaly_maps(masked_rast_dif,year)
   
 }

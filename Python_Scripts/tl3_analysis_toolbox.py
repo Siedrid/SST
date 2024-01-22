@@ -364,8 +364,8 @@ class crop:
         output=output.astype(float)
         output[output==0]=np.nan
         return output.squeeze(0)
-    
-    def create_mask_from_shp_tiles(self,geoms,ds):
+   
+    def create_mask_from_shp_tiles(self,geoms,tl):
         my_func_name='create_mask_from_shp_tiles'
         print(datetime.now().strftime("%H:%M:%S")+' '+my_func_name)
         tile_corn={
@@ -374,7 +374,7 @@ class crop:
             "t03":(899500,3200500),
             "t04":(4149500,3200500)
             }
-        pdb.set_trace()
+        
         transform=from_origin(tile_corn[tl][0],tile_corn[tl][1] , 1000, 1000) # TL Coordinates upper left and pixel size (meters)
         arr = np.full((2300, 3250),fill_value=1, dtype="uint8") # Mask template shape of the TL extent
         # Create in memory rasterio ds
@@ -395,6 +395,15 @@ class crop:
         output[output==0]=np.nan
         return output.squeeze(0)
     
+    def mask_ds_with_shp(self,ds,mask,polygon,crop):
+        geoms=rasterio.warp.transform_geom('EPSG:4326','EPSG:3035',[polygon['geometry']])
+        for varname in list(ds.keys()):
+            ds[varname]=ds[varname]*mask
+        if crop==True:
+            bounds=rasterio.features.bounds(geoms[0])
+            ds=ds.sel(x=slice(bounds[0],bounds[2]),y=slice(bounds[3],bounds[1]))  
+        return ds
+    '''
     def crop_ds_with_shp_tiles(self,ds,shp,crop,tl):
         my_func_name='crop_ds_with_shp_tiles'
         print(datetime.now().strftime("%H:%M:%S")+' '+my_func_name)
@@ -407,6 +416,7 @@ class crop:
             bounds=rasterio.features.bounds(geoms[0])
             ds=ds.sel(x=slice(bounds[0],bounds[2]),y=slice(bounds[3],bounds[1]))  
         return ds
+    '''
     '''
     def create_mask_from_shp(self,geoms):   
         my_func_name='create_mask_from_shp'

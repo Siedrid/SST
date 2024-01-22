@@ -22,6 +22,7 @@ import pandas as pd
 import pdb
 #from fiona.model import to_dict
 import fiona
+import argparse
 
 def write_nc(xds, fn):
     '''
@@ -76,11 +77,12 @@ def mask_ds_with_shp(ds,mask,polygon,crop):
         ds=ds.sel(x=slice(bounds[0],bounds[2]),y=slice(bounds[3],bounds[1]))  
     return ds
 
-def count_valid_pixel_study_area(path_in,short):
+def count_valid_pixel_study_area(path_in,short,stats):
     shapefile=fiona.open(shp_study_area, "r")
-    polygon=[poly for poly in shapefile if poly['properties']['NAME']==IHO_name][0]
+    #polygon=[poly for poly in shapefile if poly['properties']['NAME']==IHO_name][0]
+    polygon=[poly for poly in shapefile if IHO_name[0:6] in poly['properties']['NAME']][0]
     
-    file_mk=path_in+short+'/'+'01_merged_mosaic_dif_1990_'+short+'.nc'
+    file_mk=path_in+short+'/'+'01_merged_mosaic_dif_1990_'+ short + '_'+stats+'.nc' 
     monthly_mk=xr.open_dataset(file_mk)
 
     # Create binary mask from study area shape
@@ -88,28 +90,27 @@ def count_valid_pixel_study_area(path_in,short):
     resolution=1000
     epsg_poly='4326'
     epsg_mask='3035'
-    mask_shape=monthly_mk.sst_dif_max.shape
+    mask_shape=monthly_mk.sst_dif_med.shape
     mask=tl_crop.create_mask_from_shp(polygon,mask_shape,coord_upper_left,resolution,epsg_poly,epsg_mask)
     
     count=(mask==1).sum()
     return pd.DataFrame({'short':[short],'count':[count]})
 
-def count_trends_study_area(study_area_stats,path_mk,path_stats):
+def count_trends_study_area(study_area_stats,path_mk,path_stats,short,stats):
     stats_trend=pd.DataFrame()
-    for short in study_area_stats['short']:
-        for m in range(1,13):
-            file_mk=path_mk+short+'/'+str(m).zfill(2)+'_merged_mosaic_mk_'+short+'.nc'
-            monthly_mk=xr.open_dataset(file_mk)
-            count=int(np.isfinite(monthly_mk.p).sum())
-            count_all=int(study_area_stats[study_area_stats.short==short]['count'])
-            percent=count/count_all*100
-            stats=pd.DataFrame({'short':[short], 'month':[m],'count':[count],'count_all':[count_all],
-                                'percent':[percent]})
-            stats_trend=stats_trend.append(stats)
-    stats_trend.to_csv(path_stats+'stats_trend.csv')
+    for m in range(1,13):
+        file_mk=path_mk+short+'/'+str(m).zfill(2)+'_merged_mosaic_mk_'+ short + '_'+stats+'.nc' 
+        monthly_mk=xr.open_dataset(file_mk)
+        count=int(np.isfinite(monthly_mk.p).sum())
+        count_all=int(study_area_stats[study_area_stats.short==short]['count'])
+        percent=count/count_all*100
+        stats_m=pd.DataFrame({'short':[short], 'month':[m],'count':[count],'count_all':[count_all],
+                            'percent':[percent]})
+        stats_trend=stats_trend.append(stats_m)
+    stats_trend.to_csv(path_stats+'stats_trend_'+short+'.csv')
 
 
-def mosaic_mk(IHO_name):
+def mosaic_mk(IHO_name,stats):
     '''
     Function mosaics 1x1° tiles processed with monthly_anomalies.py on the basis of the tile_lists csv dataframes on Drive.
     Names of the csv files refer to the official boundaries defined in the IHO dataset.
@@ -134,8 +135,8 @@ def mosaic_mk(IHO_name):
         
         print('Mosaicing month ' + str(month))
         
-        dif_lst = [path_in + poly_id + '_' + str(month).zfill(2) + '_monthly_dif.nc' for poly_id in poly_lst]
-        mk_lst = [path_in + poly_id + '_' + str(month).zfill(2) + '_monthly_mk.nc' for poly_id in poly_lst]
+        dif_lst = [path_in + poly_id + '_' + str(month).zfill(2) + '_monthly_dif_'+stats+'.nc' for poly_id in poly_lst]
+        mk_lst = [path_in + poly_id + '_' + str(month).zfill(2) + '_monthly_mk_'+stats+'.nc' for poly_id in poly_lst]
         
         mk_lst_sort = []
         dif_lst_sort = []
@@ -167,13 +168,14 @@ def mosaic_mk(IHO_name):
         # Merge MannKendall
         print('Merging ...')
         chunksize=[50,50,50] # wird nicht mehr benötigt
+        
         monthly_mk = reproj.mosaic_vars(mk_ds, mk_vars, chunksize)
         
         # Mask with actual study area
         shapefile=fiona.open(shp_study_area, "r")
         #polygon=[to_dict(poly) for poly in shapefile if to_dict(poly)['properties']['NAME']==IHO_name][0]
-        
-        polygon=[poly for poly in shapefile if poly['properties']['NAME']==IHO_name][0]
+        #polygon=[poly for poly in shapefile if poly['properties']['NAME']==IHO_name][0]
+        polygon=[poly for poly in shapefile if IHO_name[0:4] in poly['properties']['NAME']][0]
         
         # Create binary mask from study area shape
         coord_upper_left=(np.array(monthly_mk.x)[0],np.array(monthly_mk.y)[0])
@@ -190,10 +192,10 @@ def mosaic_mk(IHO_name):
         
         # Write to netCDF
         print('Write ...')
-        outfile = p + str(month).zfill(2) + '_merged_mosaic_mk_' + short +'.nc'        
+        outfile = p + str(month).zfill(2) + '_merged_mosaic_mk_' + short +'_'+stats+'.nc'          
         write_nc(monthly_mk, outfile)
         
-        outfile= p +str(month).zfill(2) + '_merged_mosaic_dif_' + short + '.nc'        
+        outfile= p +str(month).zfill(2) + '_merged_mosaic_dif_' + short + '_'+stats+'.nc'        
        # write_nc(monthly_dif, outfile)
     
         print('Closing Datasets ...')
@@ -204,7 +206,7 @@ def mosaic_mk(IHO_name):
 
 #%% Mosaic Anomalies for 2022
 
-def mosaic_anomalies(IHO_name, year, shp_study_area):
+def mosaic_anomalies(IHO_name, year, shp_study_area,stats):
     '''
     Mosaics anomalies for specific years only. Otherwise same as in mosaic_ds
 
@@ -229,7 +231,7 @@ def mosaic_anomalies(IHO_name, year, shp_study_area):
     #for month in [3]:    
         print('Mosaicing month-year ' + str(month)+'-'+str(year))
         
-        dif_lst = [path_in + poly_id + '_' + str(month).zfill(2) + '_monthly_dif.nc' for poly_id in poly_lst]
+        dif_lst = [path_in + poly_id + '_' + str(month).zfill(2) + '_monthly_dif_'+stats+'.nc' for poly_id in poly_lst]
         
         dif_lst_sort = []
         for i in range(len(dif_lst)):
@@ -246,26 +248,27 @@ def mosaic_anomalies(IHO_name, year, shp_study_area):
             for d in range(len(dif_lst_sort)):
                 
                 dif_ds_2022[d]['obs_count'] = dif_ds_2022[d].obs_count.where(dif_ds_2022[d]['obs_count'] != 0)
-                dif_ds_2022[d]['sst_dif_max'] = dif_ds_2022[d]['sst_dif_max']
+                dif_ds_2022[d]['sst_dif_med'] = dif_ds_2022[d]['sst_dif_med']
     
             print('Merging ...')
             chunksize=[50,50,50]
             
             # Merge Monthly Anomalies
-            monthly_dif = reproj.mosaic_vars(dif_ds_2022, ['sst_dif_max', 'obs_count'], chunksize)
+            monthly_dif = reproj.mosaic_vars(dif_ds_2022, ['sst_dif_med', 'obs_count'], chunksize)
             
             # Mask with actual study area
             shapefile=fiona.open(shp_study_area, "r")
             #polygon=[to_dict(poly) for poly in shapefile if to_dict(poly)['properties']['NAME']==IHO_name][0]
             
-            polygon=[poly for poly in shapefile if poly['properties']['NAME']==IHO_name][0]
+            #polygon=[poly for poly in shapefile if poly['properties']['NAME']==IHO_name][0]
+            polygon=[poly for poly in shapefile if IHO_name[0:4] in poly['properties']['NAME']][0]
             
             # Create binary mask from study area shape
             coord_upper_left=(np.array(monthly_dif.x)[0],np.array(monthly_dif.y)[0])
             resolution=1000
             epsg_poly='4326'
             epsg_mask='3035'
-            mask_shape=monthly_dif.sst_dif_max.shape
+            mask_shape=monthly_dif.sst_dif_med.shape
             
             mask=tl_crop.create_mask_from_shp(polygon,mask_shape,coord_upper_left,resolution,epsg_poly,epsg_mask)
             monthly_dif=mask_ds_with_shp(monthly_dif, mask, polygon, crop=True)
@@ -273,7 +276,7 @@ def mosaic_anomalies(IHO_name, year, shp_study_area):
             
             # Write to netCDF
             print('Write ...')        
-            outfile= p + str(month).zfill(2) + '_merged_mosaic_dif_'+str(year)+'_' + short + '.nc'        
+            outfile= p + str(month).zfill(2) + '_merged_mosaic_dif_'+str(year)+'_' + short + '_'+stats+'.nc'        
             write_nc(monthly_dif, outfile)
         
             print('Closing Datasets ...')
@@ -282,9 +285,22 @@ def mosaic_anomalies(IHO_name, year, shp_study_area):
             print('There are no datasets available for '+str(month)+'-'+str(year))
         gc.collect()
 
+def initargs():
+    '''
+    Argument definition, also handles user input
+    '''
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    #parser.add_argument('--start', help='No help',required=False)
+    #parser.add_argument('--stop', help='No help',required=False)
+    parser.add_argument('--stats', help='No help',required=False)
+    parser.add_argument('--study_area', help='No help',required=False)
+    return parser.parse_args()   
 
 #%% Main Workflow
 if __name__ == '__main__':
+    args=initargs()
+    stats=args.stats
+    study_area=args.study_area
     
     reproj=tl3_analysis_toolbox.reproj()
     tl_crop = tl3_analysis_toolbox.crop()
@@ -304,8 +320,8 @@ if __name__ == '__main__':
     all_shp = shp_path + 'intersting_sst_analysis.shp'
     shp_study_area='E:/Publications/SST_analysis/Final_Study_Areas/final_areas.shp'
     '''
-    path_in = '/nfs/IGARSS_2022/Results_Laura/Monthly_Results/'
-    path_out = '/nfs/IGARSS_2022/Results_Laura/Composites/'
+    path_in = '/nfs/IGARSS_2022/Results_Laura/Monthly_Results/New_Test/'
+    path_out = '/nfs/IGARSS_2022/Results_Laura/Composites/Median/'
     #path_out = '/nfs/IGARSS_2022/Results_Laura/Composites/MK/'
     tile_list_path = "/nfs/IGARSS_2022/Results_Laura/to_process/"
     path_stats='/nfs/IGARSS_2022/Results_Laura/Stats/'
@@ -313,43 +329,45 @@ if __name__ == '__main__':
     shp_path = '/nfs/IGARSS_2022/Results_Laura/Shps/'
     all_shp = shp_path + 'intersting_sst_analysis.shp'
     shp_study_area=shp_path+'final_areas.shp'
-    
+    '''
     study_areas = {
         'Skagerrak': 'A',
         'Adriatic Sea': 'B',
         'Aegean Sea': 'C',
         'Balearic (Iberian Sea)': 'D'
         } 
-    
+    '''
     study_area_stats=pd.DataFrame()
     
-    for key in study_areas.keys():
+    #for key in study_areas.keys():
     #for key in ['Adriatic Sea']:
-        IHO_name = key 
-        print('Mosaicing ' + IHO_name)
-        short = short_from_IHO(IHO_name)
-        poly_lst = read_tile_lst(IHO_name)
-        
-        '''
-        p = path_out + short + '/'
-        if not os.path.exists(p):
-            os.makedirs(p)    
-            
-        #mosaic_mk(IHO_name)
-        #for year in range(1990,2022,1):
-        for year in [2022]:
-            mosaic_anomalies(IHO_name, year,shp_study_area)
-        '''
-        stats=count_valid_pixel_study_area(path_out, short)
-        study_area_stats=study_area_stats.append(stats)
+    IHO_name = study_area 
+    print('Mosaicing ' + IHO_name)
+    short = short_from_IHO(IHO_name)
+    poly_lst = read_tile_lst(IHO_name)
     
-    stats_out=path_stats+'study_area_stats.csv'
+    '''
+    p = path_out + short + '/'
+    if not os.path.exists(p):
+        os.makedirs(p)    
+        
+    mosaic_mk(IHO_name,stats)
+   
+    for year in range(1990,2023,1):
+    #for year in [2022]:
+        mosaic_anomalies(IHO_name, year,shp_study_area,stats)
+    '''
+    
+    stats_sa=count_valid_pixel_study_area(path_out,short,stats)
+    study_area_stats=study_area_stats.append(stats_sa)
+    
+    stats_out=path_stats+'study_area_stats_'+short+'.csv'
     study_area_stats.to_csv(stats_out)
     
     study_area_stats=pd.read_csv(stats_out)
-    path_mk=path_out+'MK/'
-    count_trends_study_area(study_area_stats, path_mk, path_stats)
-  
+    #path_mk=path_out+'MK/'
+    count_trends_study_area(study_area_stats, path_out, path_stats,short,stats)
+    
         
         
         

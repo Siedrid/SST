@@ -39,8 +39,8 @@ load_shp <- function(shp_path){
 # create SpatRaster from MK datasets, layer = slope
 stack_lst <- function(short){
   # Read Statistic of valid trends observations
-  trend_stats <- read.csv("E:/Publications/SST_analysis/Stats/stats_trend.csv")
-  threshold<-10
+  trend_stats <- read.csv(paste0("E:/Publications/SST_analysis/Stats/","stats_trend_",short,".csv"))
+  threshold<-30
   r_list <- list()
   month_list <- c()
   for (m in 1:12){
@@ -130,7 +130,7 @@ plot_coast_dist <- function(df_long){
   xlab("Distance [km]")+
   ylab("Slope [K/decade]")+
   guides(fill=guide_legend(title="Month"))+
-  ylim(-0.5, 1)
+  ylim(0, 1)
   ggsave(paste0(plt_path, 'coast_dist.png'))
 }
 
