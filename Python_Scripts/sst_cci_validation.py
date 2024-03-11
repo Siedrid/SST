@@ -69,8 +69,8 @@ def missing_polys(all_shp, path_in):
 def get_shp_new(all_shp,IHO_name):
     ocean_shp = gpd.read_file(all_shp)
     #sel_ocean = ocean_shp.loc[ocean_shp['NAME'] == IHO_name]
-    #sel_ocean=ocean_shp[ocean_shp['NAME'].str.contains(IHO_name[0:6])]
-    sel_ocean=ocean_shp.loc[ocean_shp['id'] == int(IHO_name)]
+    sel_ocean=ocean_shp[ocean_shp['NAME'].str.contains(IHO_name[0:6])]
+    #sel_ocean=ocean_shp.loc[ocean_shp['id'] == int(IHO_name)]
     geometry = sel_ocean.geometry
     return geometry
     
@@ -234,6 +234,7 @@ def sst_timeseries(IHO_name,stats):
                     #xds_cci_cropped = xds_cci.rio.clip([geometry])
                     xds_cci_cropped = xds_cci.rio.clip(geometry)
                     med_sst_cci.append(np.nanmedian(xds_cci_cropped.sst_cci_anom))
+                   
                                     
                 if y >= 2017:
                     med_sst_cci.append(np.nan)
@@ -243,6 +244,47 @@ def sst_timeseries(IHO_name,stats):
     return df
         
 #%% load csv Data
+
+def write_cci_monthly_anomalies(IHO_name,all_shp,path_cci,path_cci_composites):
+    geometry = get_shp_new(all_shp, IHO_name)
+    
+    #for month in range(1,13):
+    for month in [4]:    
+        #for y in range(1990,2017):
+        for y in [1992]:
+            print('Compositing '+str(y)+ '-' + str(month).zfill(2))
+            fs_cci=[path_cci + f for f in os.listdir(path_cci) if (f[4:6]==str(month).zfill(2)) and (f[0:4]==str(y)) and ('CDR2.1_anomaly-v02.0' in f)]
+            ds_cci=xr.open_mfdataset(fs_cci,chunks={'x': 2300, 'y': 3250},preprocess=prep.add_date)
+            xds_cci=xr.Dataset(coords={'lat':ds_cci.coords['lat'],'lon':ds_cci.coords['lon']},
+                                   attrs=ds_cci.attrs)
+            # Calculate monthly median CCI composite from daily data
+            xds_cci['sst_cci_anom']=ds_cci['analysed_sst_anomaly'].median(dim='time')
+            xds_cci.coords['t'] = y
+            xds_cci = xds_cci.rio.write_crs("epsg:4326", inplace = True)
+            print('Crop to Polygon')
+           
+            #xds_cci_cropped = xds_cci.rio.clip([geometry])
+            xds_cci_cropped = xds_cci.rio.clip(geometry)
+            xds_laea = xds_cci_cropped.rio.reproject("EPSG:3035")
+            
+            outfile=path_cci_composites+str(month).zfill(2) + '_merged_mosaic_dif_'+str(y)+'_' + IHO_name + '.nc' 
+            write_nc(xds_laea,outfile)
+            
+            #xds_cci_cropped = xds_cci.rio.clip([geometry])
+            ds_cci=ds_cci[['analysed_sst_anomaly','analysed_sst_uncertainty']]
+            ds_cci = ds_cci.rio.write_crs("epsg:4326", inplace = True)
+            ds_cci_cropped = ds_cci.rio.clip(geometry)
+            ds_laea = ds_cci_cropped.rio.reproject("EPSG:3035")
+            
+            outfile=path_cci_composites+str(month).zfill(2) + '_merged_mosaic_dif_'+str(y)+'_' + IHO_name + '_whole.nc' 
+            write_nc(ds_laea,outfile)
+           
+            
+
+    
+            
+            
+        
 
 def get_linear_trend(data):
     
@@ -289,11 +331,20 @@ def get_linear_trend_theilsen(data):
 
 # Plot anomalies
 
+def fill_with_cci(df):
+    # Replace timeline SST from 1994 with CCI SST due to NOAA-11 errors
+    df.loc[(df.datetime>datetime(1994,1,1))&(df.datetime<datetime(1994,8,1)),'med_sst']=np.array(df.loc[(df.datetime>datetime(1994,1,1))
+                                                                                                        &(df.datetime<datetime(1994,8,1))]['cci_sst'])  
+    return df
+    
+
+
 def plot_anomalies(df, site_letter,stats):
     
     #df = load_sst_ts(short)
     df=df[np.isfinite(df.cci_sst)]
     #df=df[df.datetime>datetime(1995,1,1)]
+    df=fill_with_cci(df)
     
     # Calculate Rolling Mean
     df['roll_mean_tl'] = df['med_sst'].rolling(12,min_periods=1).mean()
@@ -309,11 +360,11 @@ def plot_anomalies(df, site_letter,stats):
     ax.axhline(y = 0, color = 'black')
     ax.plot(df.datetime, df.roll_mean_tl,color='black',linewidth=6,label='TIMELINE 1-year moving mean')
     ax.plot(df.datetime, df.roll_mean_cci,color='green',linewidth=6,label='CCI 1-year moving mean')
-    ax.plot(df.datetime, df.lin_tr_tl, color='black',linewidth=6,linestyle='--', label = 'TL Linear Trend')
-    ax.plot(df.datetime, df.lin_tr_cci, color = 'green', linewidth=6, linestyle = '--', label = 'CCI Linear Trend')
+    ax.plot(df.datetime, df.lin_tr_tl, color='black',linewidth=6,linestyle='--', label = 'TIMELINE linear trend')
+    ax.plot(df.datetime, df.lin_tr_cci, color = 'green', linewidth=6, linestyle = '--', label = 'CCI linear trend')
     
-    ax.text(df.datetime[10], 2.5, 'TIMELINE Trend ('+str(round(yr_tr_tl,2))+' K/decade)', fontsize = 40)
-    ax.text(df.datetime[10], 2.0, 'CCI Trend ('+str(round(yr_tr_cci,2))+' K/decade)', fontsize = 40)
+    ax.text(df.datetime[10], 2.5, 'TIMELINE trend ('+str(round(yr_tr_tl,2))+' K/decade)', fontsize = 40)
+    ax.text(df.datetime[10], 2.0, 'CCI trend ('+str(round(yr_tr_cci,2))+' K/decade)', fontsize = 40)
     
     fontsize=40
     ax.tick_params(labelsize=fontsize)
@@ -322,10 +373,11 @@ def plot_anomalies(df, site_letter,stats):
     ax.set_ylim(-3,3)
     ax.set_xlim(datetime(1989,12,1),datetime(2017,2,1))
     ax.legend(fontsize = fontsize -10, markerscale = 1.2, loc = 'lower right')
-    ax.set_title('SST anomalies for ' + site_letter, fontsize = fontsize)
+    ax.set_title('SST Anomalies for the ' + site_letter, fontsize = fontsize)
     ax.grid()
     fig.tight_layout()
     fig.savefig(plt_out + short + '_CCI_TL_anomalies_'+stats+'.png')
+    return df
     
 
 def plot_difference(df,title,stats):
@@ -375,9 +427,9 @@ def plot_TL_anomalies(df, site_letter,stats):
     ax.bar(data_pos.datetime,data_pos['med_sst'],width=30,color='red',alpha=0.7,label='TIMELINE anomalies (positive)')
     ax.bar(data_neg.datetime,data_neg['med_sst'],width=30,color='blue',alpha=0.7,label='TIMELINE anomalies (negative)')
     
-    ax.plot(df.datetime, df.roll_mean_tl,color='black',linewidth=3,label='TIMELINE 1-year moving mean')
-    ax.plot(df.datetime, df.lin_tr_tl, color='black',linewidth=3,linestyle='--')
-    ax.text(df.datetime[10], 2.5, 'Linear Trend ('+str(round(yr_tr_tl,2))+' K/decade)', fontsize = 40)
+    ax.plot(df.datetime, df.roll_mean_tl,color='black',linewidth=6,label='TIMELINE 1-year moving mean')
+    ax.plot(df.datetime, df.lin_tr_tl, color='black',linewidth=6,linestyle='--')
+    ax.text(df.datetime[10], 2.5, 'Linear trend ('+str(round(yr_tr_tl,2))+' K/decade)', fontsize = 40)
     
     fontsize=40
     ax.tick_params(labelsize=fontsize)
@@ -385,12 +437,22 @@ def plot_TL_anomalies(df, site_letter,stats):
     ax.set_ylim(-3,3)
     ax.set_xlim(datetime(1989,12,1),datetime(2023,2,1))
     ax.legend(fontsize = fontsize -10, markerscale = 1.2, loc = 'lower right')
-    ax.set_title('SST anomalies for ' + site_letter, fontsize = fontsize)
+    ax.set_title('SST Anomalies for the ' + site_letter, fontsize = fontsize)
     ax.grid()
     fig.tight_layout()
     fig.savefig(plt_out + short + '_TL_anomalies_'+stats+'.png')
 
-
+def anomaly_stats(df):
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(df['med_sst'],df['cci_sst'])
+    slope_rolling, intercept_rolling, r_rolling, p_rolling, std_er_rolling = scipy.stats.linregress(df['roll_mean_tl'],df['roll_mean_cci'])
+    rmse_anom=((df['med_sst']-df['cci_sst'])** 2).mean() ** .5
+    rmse_rolling=((df['roll_mean_tl']-df['roll_mean_cci'])** 2).mean() ** .5
+    df_out=pd.DataFrame({'r_anom':[round(r_value,2)],'r2_anom':[round(r_value**2,2)],
+                         'r_rolling':[round(r_rolling,2)],'r2_rolling':[round(r_rolling**2,2)],
+                         'rmse_anom':[round(rmse_anom,2)],'rmse_rolling':[round(rmse_rolling,2)]})
+    return df_out
+    
+    
 def initargs():
     '''
     Argument definition, also handles user input
@@ -428,21 +490,22 @@ if __name__ == '__main__':
     plt_path = '/nfs/IGARSS_2022/Results_Laura/Plots/'
     path_out = '/nfs/IGARSS_2022/Results_Laura/Plots/'
     path_poly='/nfs/IGARSS_2022/Results_Laura/Monthly_Results/New_Test/'
+    path_cci_composites = '/nfs/IGARSS_2022/Results_Laura/CCI_composites/'
     
     tile_list_path = "/nfs/IGARSS_2022/Results_Laura/to_process/"
     
     ocean_path = "/nfs/IGARSS_2022/Results_Laura/Shps/"
     shp_path = '/nfs/IGARSS_2022/Results_Laura/Shps/'
-    all_shp = shp_path + 'intersting_sst_analysis.shp'
-    #all_shp = shp_path + 'final_areas.shp'
-    '''
+    #all_shp = shp_path + 'intersting_sst_analysis.shp'
+    all_shp = shp_path + 'final_areas.shp'
+  
     study_areas = {
-        'Skagerrak': 'A',
-        'Adriatic Sea': 'B',
-        'Aegean Sea': 'C',
-        'Balearic (Iberian Sea)': 'D'
+        'Skagerrak': 'North and Baltic Sea',
+        'Adriatic_Sea': 'Adriatic Sea',
+        'Aegean_Sea': 'Aegean Sea',
+        'Balearic_Iberian_Sea':'Balearic Sea'
         } 
-    '''
+   
     #study_areas={'3608':'3608'}
     #for key in study_areas.keys():
     #for key in [poly_id]:
@@ -453,7 +516,7 @@ if __name__ == '__main__':
     short=IHO_name
     
     plt_out = path_out + short + '/'
-    
+    '''
     if not os.path.exists(plt_out):
         os.makedirs(plt_out)    
     
@@ -463,15 +526,21 @@ if __name__ == '__main__':
     df=sst_timeseries_poly(path_poly, IHO_name,stats)
     #df_tl = df_tl.sort_values(by='Date')
     sorted_df = write_sst_ts(df, short,stats)
-    
-    df = load_sst_ts(short,stats)
+    '''
+   
+    #df = load_sst_ts(short,stats)
     #df['med_sst']=np.array(df_tl['med_sst'])
     #pdb.set_trace()
     
     
-    plot_anomalies(df, study_area,stats)
-    plot_TL_anomalies(df, study_area,stats)
-    plot_difference(df, study_area,stats)
-
-
-  
+    
+    #df_stats=plot_anomalies(df, study_areas[study_area],stats)
+    '''
+    plot_TL_anomalies(df, study_areas[study_area],stats)
+    plot_difference(df, study_areas[study_area],stats)
+    
+    anom_stats=anomaly_stats(df_stats)
+    outfile=plt_out+'anomaly_stats_'+study_area+'_'+stats+'.csv'
+    anom_stats.to_csv(outfile)
+    '''
+    write_cci_monthly_anomalies(IHO_name,all_shp,path_cci,path_cci_composites)

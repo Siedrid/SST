@@ -132,7 +132,7 @@ def mosaic_mk(IHO_name,stats):
         os.makedirs(p)
     
     for month in range(1,13):
-        
+    #for month in [4]:   
         print('Mosaicing month ' + str(month))
         
         dif_lst = [path_in + poly_id + '_' + str(month).zfill(2) + '_monthly_dif_'+stats+'.nc' for poly_id in poly_lst]
@@ -159,16 +159,17 @@ def mosaic_mk(IHO_name,stats):
             
             # mask non-significant pixel
             mask = mk_ds[d]['h'] == 1
+            #mask = mk_ds[d]['p'] <= 0.9
+            #mask = np.isfinite(mk_ds[d]['h'])
             #dif_ds[d]['obs_count'] = dif_ds[d].obs_count.where(dif_ds[d]['obs_count'] != 0)
             #dif_ds[d]['sst_dif_max'] = dif_ds[d]['sst_dif_max'] # Possibility to select specific years, if not all years are of interest
-
+           
             for var in mk_vars:           
                 mk_ds[d][var] = mk_ds[d][var].where(mask)
-
+           
         # Merge MannKendall
         print('Merging ...')
         chunksize=[50,50,50] # wird nicht mehr benötigt
-        
         monthly_mk = reproj.mosaic_vars(mk_ds, mk_vars, chunksize)
         
         # Mask with actual study area
@@ -321,7 +322,7 @@ if __name__ == '__main__':
     shp_study_area='E:/Publications/SST_analysis/Final_Study_Areas/final_areas.shp'
     '''
     path_in = '/nfs/IGARSS_2022/Results_Laura/Monthly_Results/New_Test/'
-    path_out = '/nfs/IGARSS_2022/Results_Laura/Composites/Median/'
+    path_out = '/nfs/IGARSS_2022/Results_Laura/Composites/Median/max_daytime_cor/'
     #path_out = '/nfs/IGARSS_2022/Results_Laura/Composites/MK/'
     tile_list_path = "/nfs/IGARSS_2022/Results_Laura/to_process/"
     path_stats='/nfs/IGARSS_2022/Results_Laura/Stats/'
@@ -346,18 +347,18 @@ if __name__ == '__main__':
     short = short_from_IHO(IHO_name)
     poly_lst = read_tile_lst(IHO_name)
     
-    '''
+    
     p = path_out + short + '/'
     if not os.path.exists(p):
         os.makedirs(p)    
         
     mosaic_mk(IHO_name,stats)
-   
+    
     for year in range(1990,2023,1):
     #for year in [2022]:
         mosaic_anomalies(IHO_name, year,shp_study_area,stats)
+   
     '''
-    
     stats_sa=count_valid_pixel_study_area(path_out,short,stats)
     study_area_stats=study_area_stats.append(stats_sa)
     
@@ -367,7 +368,7 @@ if __name__ == '__main__':
     study_area_stats=pd.read_csv(stats_out)
     #path_mk=path_out+'MK/'
     count_trends_study_area(study_area_stats, path_out, path_stats,short,stats)
-    
+    '''
         
         
         

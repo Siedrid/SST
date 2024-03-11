@@ -14,6 +14,9 @@ import tl3_analysis_toolbox
 import rasterio
 from datetime import date
 import pdb
+from scipy.optimize import leastsq
+import warnings
+warnings.filterwarnings("ignore")
 
 def mask_ds_with_shp(ds,mask,polygon,crop):
     geoms=rasterio.warp.transform_geom('EPSG:4326','EPSG:3035',[polygon['geometry']])
@@ -23,7 +26,7 @@ def mask_ds_with_shp(ds,mask,polygon,crop):
         bounds=rasterio.features.bounds(geoms[0])
         ds=ds.sel(x=slice(bounds[0],bounds[2]),y=slice(bounds[3],bounds[1]))  
     return ds
-
+'''
 path_stats='/nfs/IGARSS_2022/Results_Laura/Stats/'
 
 study_areas = {
@@ -114,42 +117,104 @@ for IHO_name in study_areas.keys():
                      'month':months,'day':days,'year':years,'hour':hours})        
     outfile=path_stats+IHO_name+'_observation_time_stats.csv'
     df.to_csv(outfile)
-
+'''
 
         
+def get_residuals(vars,t,anom):
+    a=vars[0]
+    b=vars[1]
+    sst_mod=dtc(t,a,b)
+    return abs(anom-sst_mod)
+
+def dtc(t,a,b):
+    return a*np.cos((t*12.29)+4)+b
 
 
 
-path='E:/Publications/SST_analysis/Test/dif/'
-df_Adriatic_stats=pd.read_csv(path+'Adriatic Sea_observation_time_stats.csv')
+
+'''
 for i in range(1,13):
     df_sub=df_Adriatic_stats[df_Adriatic_stats.month==i]
+    df_sub['dif']=abs(df_sub.sst_median-np.median(df_sub.sst_median))
+    df_sub=df_sub[df_sub.dif<3]
     fig=plt.figure()
     ax=fig.add_subplot(111)
-    df_sub.boxplot(column=['sst_maximum'],by='hour',ax=ax)
+    df_sub.boxplot(column=['sst_median'],by='hour',ax=ax)
     fig.suptitle(str(i).zfill(2))
     fig.savefig(path+'obs_time'+str(i).zfill(2)+'.png')
 
+for i in range(1,13):
+    df_sub=df_Adriatic_stats[df_Adriatic_stats.month==i]
+    df_sub['dif']=abs(df_sub.sst_median-np.median(df_sub.sst_median))
+    df_sub=df_sub[df_sub.dif<3]
+    medians=[]
+    for hour in range(8,20):
+        df_hour=df_sub[df_sub.hour==hour]
+        #print(np.nanmedian(df_hour.sst_median))
+        medians.append(np.nanmedian(df_hour.sst_median))
+    
+    day_anom=np.array(medians)-np.nanmedian(medians)
+    plt.plot(range(8,20),day_anom)
+    plt.title(str(i))
+    plt.show()
+'''    
+path='E:/Publications/SST_analysis/daytime_correction/'
+study_areas=['Adriatic_Sea','Aegean_Sea','Balearic_Iberian_Sea']
 
-
-df_Adriatic_Sea=pd.read_csv(path+'Adriatic_SeaCCI_TL_difference.csv')
-
-
-
-'''
-path='E:/Publications/SST_analysis/Test/dif/'
-
-df_Skagerrak=pd.read_csv(path+'SkagerrakCCI_TL_difference.csv')
-df_Adriatic_Sea=pd.read_csv(path+'Adriatic_SeaCCI_TL_difference.csv')
-df_Balearic_Iberian_Sea=pd.read_csv(path+'Balearic_Iberian_SeaCCI_TL_difference.csv')
-df_Aegean_Sea=pd.read_csv(path+'Aegean_SeaCCI_TL_difference.csv')
-
-file=path+'TL-L3-SST-AVHRR_NOAA-199408_decade3-fv0101_t04.nc'
-'''
-
-
-
-
-
-#plt.plot(sst_list)
-#plt.boxplot(sst_list)
+for study_area in study_areas:
+    df_Adriatic_stats=pd.read_csv(path+study_area+'_observation_time_stats.csv')
+    
+    a_s=[]
+    b_s=[]
+    c_s=[]
+    d_s=[]
+    i_s=[]
+    for i in range(1,13):
+        df_sub=df_Adriatic_stats[df_Adriatic_stats.month==i]
+        df_sub=df_sub[(df_sub.hour>4)&(df_sub.hour<25)]
+        df_sub['dif']=abs(df_sub.sst_median-np.median(df_sub.sst_median))
+        df_sub=df_sub[df_sub.dif<3]
+        medians=[]
+        hours=np.array(range(1,25))
+        for hour in hours:
+            df_hour=df_sub[df_sub.hour==hour]
+            #print(np.nanmedian(df_hour.sst_median))
+            medians.append(np.nanmedian(df_hour.sst_median))
+        anom=np.array(medians)-np.nanmedian(medians)
+        
+        valid=np.isfinite(anom)
+        hours=hours[valid]
+        anom=anom[valid]
+        
+        vars=[1,1]
+        out=leastsq(get_residuals,vars,args=(hours,anom))
+        
+        
+        a=out[0][0]
+        b=out[0][1]
+        #print(b)
+        #print(a)
+        #a=1
+        #b=12.3
+        #c=0
+        #d=3
+        
+        a_s.append(abs(a))
+        b_s.append(b)
+        i_s.append(i)
+    
+        
+        cycle=dtc(hours, abs(a), b)
+        #plt.plot(anom)
+        
+        fig=plt.figure()
+        ax=fig.add_subplot(111)
+        df_sub.boxplot(column=['sst_median'],by='hour',ax=ax)
+        ax.plot(cycle+np.nanmedian(medians))
+        fig.suptitle(str(i).zfill(2))
+        fig.savefig(path+study_area+'_obs_time'+str(i).zfill(2)+'.png')
+        
+        
+    
+    params=pd.DataFrame({'month':i_s,'a':a_s,'b':b_s})
+    params.to_csv(path+study_area+'_daytime_params.csv')

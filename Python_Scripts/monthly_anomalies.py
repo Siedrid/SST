@@ -135,6 +135,17 @@ def mask_out_pf(xds,pf):
     xds['pf_max']=((xds['platform'])/10000).astype(int)
     xds=xds.where(xds.pf_max!=pf)
     return xds
+
+def dtc(t,a,b):
+    return a*np.cos((t*12.29)+4)+b
+
+def get_daytime_correction(t,study_area,month,path_stats):
+    print('Correct daytime')
+    params=pd.read_csv(path_stats+study_area+'_daytime_params.csv')
+    param_a=float(params[params.month==month]['a'])
+    param_b=float(params[params.month==month]['b'])
+    corr_arr=dtc(t, param_a, param_b)
+    return corr_arr
     
   
 def anomaly_trends(stats,poly_id):
@@ -149,6 +160,7 @@ def anomaly_trends(stats,poly_id):
     path_out= '/nfs/IGARSS_2022/Results_Laura/Results/New_Test/'
     poly_lst = np.unique([os.listdir(path_out)[d].split('_')[0] for d in range(len(os.listdir(path_out)))])
     path_missing='/nfs/IGARSS_2022/Results_Laura/to_process/'
+    path_stats='/nfs/IGARSS_2022/Results_Laura/Stats/'
     
     #shp='D:/TIMELINE_SST/GIS/coast_dk/coast_dk.shp'
     #shp = hard_drive + ':/TIMELINE_SST/GIS/sst_analysis_polygons/intersting_sst_analysis.shp'    
@@ -226,7 +238,7 @@ def anomaly_trends(stats,poly_id):
                      if fn !=None:
                          fns.append(fn)
             
-       
+                
                 # Stack all Observations through the time axis
                 xds = xr.open_mfdataset(fns, combine='nested', concat_dim=['t'], 
                             chunks={'x': 2300, 'y': 3250},
@@ -247,13 +259,13 @@ def anomaly_trends(stats,poly_id):
                     
                     mask=tl_crop.create_mask_from_shp(poly,mask_shape,coord_upper_left,resolution,epsg_poly,epsg_mask)
                     xds=tl_crop.mask_ds_with_shp(xds, mask, poly, crop=True)
-                    
+                   
                     xds_list.append(xds) # append to list
                         
                         
                         
                         
-                        
+                        #
                         
                 chunksize=[1000,1000,37] # wird nicht mehr benötigt
                 if temp_res == 'daily':
@@ -275,12 +287,37 @@ def anomaly_trends(stats,poly_id):
                     var=['qual_'+stats,
                          'sst_'+stats, 'sst_std', 
                          'view_time_'+stats, 'valid_obs_count','platform']
+                    
+                    
+                    if stats=='minmax':
+                        var=['qual_min', 'qual_max',
+                             'sst_min', 'sst_std', 'sst_max',
+                             'view_time_min', 'view_time_max','valid_obs_count','platform']
+                    
+                    
                     xds_merged= reproj.mosaic_vars(xds_list,[var],chunksize)
+                    
+                    # Apply daytime correction
+                    if stats=='minmax':
+                        stats1='max'
+                        cor_arr=get_daytime_correction(np.array(xds_merged['view_time_'+stats1]),study_area,dt.month,path_stats)
+                        xds_merged['sst_'+stats1]=xds_merged['sst_'+stats1]-cor_arr
+                        
+                        stats2='min'
+                        cor_arr=get_daytime_correction(np.array(xds_merged['view_time_'+stats2]),study_area,dt.month,path_stats)
+                        xds_merged['sst_'+stats2]=xds_merged['sst_'+stats2]-cor_arr
+                        # SST minmax = average between sst_min and sst_max
+                        xds_merged['sst_'+stats]=(xds_merged.sst_min+xds_merged.sst_max)/2
+                    else:
+                        cor_arr=get_daytime_correction(np.array(xds_merged['view_time_'+stats]),study_area,dt.month,path_stats)
+                        xds_merged['sst_'+stats]=xds_merged['sst_'+stats]-cor_arr
+                   
+                   
                     
                     # Mask out NOAA-11
                     #xds_merged=mask_out_pf(xds_merged, 11)
                     # Mask out early and late observation times
-                    xds_merged=xds_merged.where((xds_merged['view_time_'+stats]>10)&(xds_merged['view_time_'+stats]<15))
+                    #xds_merged=xds_merged.where((xds_merged['view_time_'+stats]>10)&(xds_merged['view_time_'+stats]<15))
                     
                     #xds_merged['sst_mean_dec']=xds_merged['sst_mean'].mean(dim='t')
                     #xds_merged['sst_max_dec']=xds_merged['sst_max'].mean(dim='t')
@@ -305,8 +342,11 @@ def anomaly_trends(stats,poly_id):
                     xds_dif['obs_count'] = xds_merged['valid_obs_count']
                         
 
-                print('Write Dif Netcdf')
+                
                 #outfile=path_out+str(poly_id)+'_'+str(doi).zfill(3)+'_' + temp_res +'_dif.nc' 
+                print('Load NC')
+                xds_dif=xds_dif.load()
+                print('Write Dif Netcdf')
                 outfile=path_out+str(poly_id)+'_'+str(doi).zfill(3)+'_' + temp_res +'_dif_'+stats+'.nc' 
                 write_nc(xds_dif, outfile)
                 #xds_doi=xr.Dataset(coords={'x':xds_merged.coords['x'],'y':xds_merged.coords['y'], 'doi':doi})
@@ -329,6 +369,8 @@ def monthly_anomaly_trends(stats,poly_id):
     '''
     path_in = '/nfs/IGARSS_2022/Results_Laura/Results/New_Test/'
     path_out= '/nfs/IGARSS_2022/Results_Laura/Monthly_Results/New_Test/'
+  
+    
     dec_doi = np.unique([os.listdir(path_in)[d].split('_')[1] for d in range(len(os.listdir(path_in)))])
     poly_lst = np.unique([os.listdir(path_in)[d].split('_')[0] for d in range(len(os.listdir(path_in)))])
     poly_lst_out = np.unique([os.listdir(path_out)[d].split('_')[0] for d in range(len(os.listdir(path_out)))])
@@ -402,7 +444,7 @@ if __name__ == '__main__':
     stats=args.stats
     study_area=args.study_area
     poly_ids=get_poly_id_from_file(study_area)
-    poly_ids=['2875']
+    #poly_ids=['2875']
     for poly_id in poly_ids:
         anomaly_trends(stats,poly_id)
         monthly_anomaly_trends(stats,poly_id)

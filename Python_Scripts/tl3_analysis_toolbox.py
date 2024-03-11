@@ -105,7 +105,6 @@ class reproj:
         tiles=['t01','t02','t03','t04']
         for tile in tiles:
             outfile=outdir+'/'+os.path.splitext(fn)[0]+'_'+tile+'.tif'
-            pdb.set_trace()
             dsRes = gdal.Warp(outfile, dsReprj, xRes = 1000, yRes = 1000, 
                               resampleAlg=resampleAlg,outputBounds=tile_exts[tile])
             dsRes = None
@@ -145,7 +144,7 @@ class reproj:
                 xds.coords['y']=xds.coords['y'].astype('int64')
                 xds_new.append(xds[var])
         #pdb.set_trace()
-        merged=xr.merge(xds_new)
+        merged=xr.merge(xds_new,compat='no_conflicts')
         merged=merged.reindex(y=list(reversed(merged.y)))
         return merged
     

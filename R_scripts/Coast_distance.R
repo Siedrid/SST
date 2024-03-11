@@ -185,4 +185,11 @@ for (i in 1:length(study_areas)){
 }
 
 df_long <- load_coast_dist(study_areas)
+
+# Change labels of study areas
+df_long$site[df_long$site == 'Skagerrak'] <- 'North and Baltic Sea'
+df_long$site[df_long$site == 'Adriatic_Sea'] <- 'Adriatic Sea'
+df_long$site[df_long$site == 'Aegean_Sea'] <- 'Aegean Sea'
+df_long$site[df_long$site == 'Balearic_Iberian_Sea'] <- 'Balearic Sea'
+
 plot_coast_dist(df_long)
